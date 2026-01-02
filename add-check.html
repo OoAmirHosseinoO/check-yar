@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ثبت چک</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-right"><i class="fa-solid fa-ellipsis-vertical" onclick="openSideMenu()"></i></div>
+        <div class="header-center"><h1 id="pageTitle">چک جدید</h1></div>
+        <div class="header-left"><span class="save-btn" id="saveBtn">ذخیره</span></div>
+    </header>
+
+    <main class="app-content page-slide-up">
+        <div class="card form-card">
+            <div class="section-title">اطلاعات پایه</div>
+            <div class="form-row"><span class="label">نوع</span><div class="type-selector"><span class="type-option active-type" id="typePay">پرداختی <i class="fa-solid fa-arrow-up red-icon"></i></span><span>|</span><span class="type-option" id="typeReceive">دریافتی <i class="fa-solid fa-arrow-down green-icon"></i></span></div></div>
+            <div class="form-row"><span class="label">مبلغ (تومان)</span><input id="inputAmount" class="clean-input blue-text-input" placeholder="مبلغ" inputmode="numeric"></div>
+            <div class="form-row"><span class="label">تاریخ سررسید</span><input id="inputDate" class="clean-input date-input-trigger" readonly placeholder="انتخاب کنید"></div>
+            <div class="form-row"><span class="label">بانک</span><input id="inputBankDisplay" class="clean-input" readonly placeholder="انتخاب کنید" onclick="openBankModal()"><input type="hidden" id="inputBankValue"></div>
+            <div class="form-row"><span class="label">وضعیت</span><input id="inputStatusDisplay" class="clean-input" readonly placeholder="در انتظار" onclick="openStatusSelectionModal()"><input type="hidden" id="inputStatusValue"></div>
+        </div>
+
+        <div class="card form-card">
+            <div class="section-title">اطلاعات تکمیلی</div>
+            <div class="form-row"><span class="label">شماره چک</span><input id="checkNum" class="clean-input" placeholder="شماره چک" inputmode="numeric"></div>
+            <div class="form-row"><span class="label">صیاد</span><input id="sayadNum" class="clean-input" placeholder="شناسه صیاد" inputmode="numeric"></div>
+            <div class="form-row"><span class="label">در وجه</span><input id="inputPayTo" class="clean-input" placeholder="انتخاب کنید" onclick="openCounterpartyModal()" readonly></div>
+            <div class="form-row"><span class="label">تاریخ صدور</span><input id="inputIssueDate" class="clean-input date-input-trigger" readonly placeholder="انتخاب کنید"></div>
+            <div class="form-row"><span class="label">توضیحات</span><input id="inputDesc" class="clean-input" placeholder="توضیحات"></div>
+        </div>
+
+        <div class="card form-card">
+            <div class="section-title">رنگ و تصویر</div>
+            <div class="color-picker-row">
+                <div class="color-circle c-red" data-color="#ff8a80"></div><div class="color-circle c-orange" data-color="#ffcc80"></div><div class="color-circle c-yellow" data-color="#ffff8d"></div><div class="color-circle c-lime" data-color="#ccff90"></div><div class="color-circle c-blue" data-color="#80d8ff"></div><div class="color-circle c-purple" data-color="#ea80fc"></div><div class="color-circle c-none selected-color" data-color="none"><i class="fa-solid fa-slash"></i></div>
+            </div>
+            <div style="display:flex; gap:10px">
+                <div class="image-upload-area" id="areaFront" style="flex:1"><div class="img-placeholder" id="previewFront"><i class="fa-solid fa-camera"></i></div><span class="upload-label">روی چک</span></div>
+                <div class="image-upload-area" id="areaBack" style="flex:1"><div class="img-placeholder" id="previewBack"><i class="fa-solid fa-camera"></i></div><span class="upload-label">پشت چک</span></div>
+            </div>
+            <input type="file" id="fileFront" style="display:none"><input type="file" id="fileBack" style="display:none">
+        </div>
+
+        <button id="deleteCheckBtn" class="delete-btn" style="display:none"><i class="fa-solid fa-trash"></i> حذف چک</button>
+        <div class="spacer"></div>
+    </main>
+
+    <!-- Side Menu -->
+    <div id="sideMenuOverlay" class="side-menu-overlay" onclick="closeSideMenu()"></div>
+    <div id="sideMenu" class="side-menu">
+        <div class="side-menu-header"><i class="fa-solid fa-user"></i> منو</div>
+        <div class="side-menu-item" onclick="openCounterpartyListMode()"><i class="fa-solid fa-address-book"></i> طرف حساب‌ها</div>
+        <div class="side-menu-item" onclick="document.getElementById('excelFileInput').click()"><i class="fa-solid fa-file-import"></i> ورود اکسل</div>
+        <div class="side-menu-item" onclick="exportToExcel()"><i class="fa-solid fa-file-export"></i> خروجی اکسل</div>
+        <div class="side-menu-item" onclick="backupToGoogle()"><i class="fa-solid fa-cloud-arrow-up"></i> بکاپ ابری</div>
+        <div class="side-menu-item" onclick="restoreFromGoogle()"><i class="fa-solid fa-cloud-arrow-down"></i> بازیابی ابری</div>
+        <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none" onchange="processExcelFile(this)">
+    </div>
+
+    <!-- Modals -->
+    <div id="bankModal" class="modal-overlay"><div class="modal-content"><div class="modal-header">انتخاب بانک</div><div id="bankListContainer" class="modal-body" style="max-height:60vh;overflow:auto"></div><div class="modal-footer"><button class="close-modal-btn" onclick="document.getElementById('bankModal').style.display='none'">بستن</button></div></div></div>
+    
+    <div id="statusSelectionModal" class="modal-overlay"><div class="modal-content"><div class="modal-header">انتخاب وضعیت</div><div class="modal-body">
+        <div class="status-option" style="color:#ffa000" onclick="selectStatus('pending','در انتظار','#ffa000')"><i class="fa-solid fa-clock"></i> در انتظار</div>
+        <div class="status-option" style="color:#4caf50" onclick="selectStatus('passed','پاس شده','#4caf50')"><i class="fa-solid fa-circle-check"></i> پاس شده</div>
+        <div class="status-option" style="color:#f44336" onclick="selectStatus('bounced','برگشتی','#f44336')"><i class="fa-solid fa-circle-xmark"></i> برگشتی</div>
+        <div class="status-option" style="color:#2196f3" onclick="selectStatus('spent','خرج شده','#2196f3')"><i class="fa-solid fa-money-bill-transfer"></i> خرج شده</div>
+        <div class="status-option" style="color:#9e9e9e" onclick="selectStatus('canceled','ابطال شده','#9e9e9e')"><i class="fa-solid fa-ban"></i> ابطال شده</div>
+    </div><div class="modal-footer"><button class="close-modal-btn" onclick="document.getElementById('statusSelectionModal').style.display='none'">انصراف</button></div></div></div>
+    
+    <div id="counterpartyModal" class="modal-overlay" style="align-items:flex-end;"><div class="modal-content modal-full-screen" style="height:100vh; border-radius:0;"><div class="modal-header"><span>طرف حساب</span><i class="fa-solid fa-plus" style="float:left;cursor:pointer" onclick="document.getElementById('addCounterpartyModal').style.display='flex'"></i><i class="fa-solid fa-arrow-down" style="float:right;cursor:pointer" onclick="document.getElementById('counterpartyModal').style.display='none'"></i></div><div class="cp-search-box"><input type="text" id="cpSearchInput" class="search-input" placeholder="جستجو..." onkeyup="searchCounterparty()"></div><div id="counterpartyList" class="modal-body" style="height:calc(100vh - 120px);overflow:auto"></div></div></div>
+    
+    <div id="addCounterpartyModal" class="modal-overlay" style="z-index:5500"><div class="modal-content"><div class="modal-header">طرف حساب جدید</div><div class="modal-body cp-add-form"><input id="newCpName" class="cp-input" placeholder="نام و نام خانوادگی"><input id="newCpNationalId" class="cp-input" placeholder="کد / شناسه ملی" inputmode="numeric"><input id="newCpPhone" class="cp-input" placeholder="شماره تماس" inputmode="numeric"></div><div class="modal-footer" style="display:flex;gap:10px"><button class="close-modal-btn" style="flex:1" onclick="document.getElementById('addCounterpartyModal').style.display='none'">انصراف</button><button class="action-btn-full" style="flex:1" onclick="saveNewCounterparty()">ذخیره</button></div></div></div>
+    
+    <div id="backupListModal" class="modal-overlay"><div class="modal-content"><div class="modal-header">انتخاب بکاپ</div><div id="backupListContainer" class="modal-body" style="max-height:60vh;overflow:auto;padding:10px"></div><div class="modal-footer"><button class="close-modal-btn" onclick="document.getElementById('backupListModal').style.display='none'">بستن</button></div></div></div>
+    
+    <div id="customCalendarModal" class="modal-overlay modal-center" style="z-index:6000"><div class="modal-content modal-content-center custom-calendar-box"><div class="picker-display-header"><div id="pickerSelectedDayName">...</div><div id="pickerSelectedFullDate">...</div></div><div style="padding:10px;display:flex;justify-content:space-between"><span onclick="calPrev()">&lt;</span><span id="calendarTitle" onclick="calSwitchView()">...</span><span onclick="calNext()">&gt;</span></div><div style="padding:10px;height:250px"><div id="calViewDays"><div class="calendar-days" id="calendarDaysGrid"></div></div><div id="calViewMonths" style="display:none"><div class="calendar-months-grid" id="calendarMonthsGrid"></div></div><div id="calViewYears" style="display:none"><div class="calendar-years-grid" id="calendarYearsGrid"></div></div></div><div class="calendar-btn-row"><button class="cal-btn btn-cancel" onclick="closeCalendarModal()">انصراف</button><button class="cal-btn btn-today" onclick="goToToday()">امروز</button><button class="cal-btn btn-confirm" onclick="confirmDateSelection()">تایید</button></div></div></div>
+
+    <div id="imageMenuModal" class="modal-overlay modal-center" style="z-index:9999"><div class="modal-content modal-content-center"><div class="modal-header">مدیریت تصویر</div><div class="modal-preview-box"><img id="menuPreviewImg" src=""></div><div class="modal-body" style="padding:0"><div class="menu-option" onclick="replaceCurrentImage()"><i class="fa-solid fa-pen-to-square"></i> جایگزینی تصویر</div><div class="menu-option" onclick="shareCurrentImage()"><i class="fa-solid fa-share-nodes"></i> اشتراک گذاری</div><div class="menu-option menu-delete" onclick="deleteCurrentImage()"><i class="fa-solid fa-trash"></i> حذف تصویر</div></div><div class="modal-footer"><button class="close-modal-btn" onclick="document.getElementById('imageMenuModal').style.display='none'">انصراف</button></div></div></div>
+    <div id="cropModal" class="modal-overlay modal-center" style="z-index:4000"><div class="modal-content modal-content-center" style="height:90vh"><div class="modal-body" style="height:80%;background:#333"><img id="imageToCrop" style="max-width:100%"></div><div class="modal-footer"><button class="action-btn-full" onclick="performCrop()">برش</button></div></div></div>
+
+    <nav class="bottom-navigation">
+        <div class="nav-item" onclick="openSideMenu()"><i class="fa-solid fa-ellipsis"></i><span>بیشتر</span></div>
+        <a href="index.html" class="nav-item"><i class="fa-solid fa-bars-staggered"></i><span>داشبورد</span></a>
+        <div class="nav-item-middle"><div class="fab-border-fix"><button class="fab-btn save-fab-btn"><i class="fa-solid fa-check"></i></button></div></div>
+        <a href="check-list.html" class="nav-item active-nav"><i class="fa-solid fa-list-check"></i><span>چک ها</span></a>
+        <a href="report.html" class="nav-item"><i class="fa-solid fa-chart-pie"></i><span>گزارش</span></a>
+    </nav>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

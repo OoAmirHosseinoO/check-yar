@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ورود به یادآور چک</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            background: #fff; 
+            padding: 0; 
+            margin: 0;
+        }
+        .login-box { 
+            width: 100%; 
+            max-width: 350px; 
+            padding: 30px; 
+            text-align: center; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+        }
+        .lg-logo { 
+            font-size: 50px; 
+            font-weight: 900; 
+            margin-bottom: 10px; 
+            letter-spacing: -3px; 
+        }
+        .brand-j { color: #00bcd4; } 
+        .brand-l { color: #26c6da; }
+        .lg-title { 
+            font-size: 18px; 
+            font-weight: bold; 
+            color: #333; 
+        }
+        .lg-sub { 
+            font-size: 12px; 
+            color: #777; 
+            margin-bottom: 15px; 
+            line-height: 1.6; 
+        }
+        
+        .lg-input { 
+            width: 100%; 
+            padding: 15px; 
+            border: 1px solid #eee; 
+            background: #f9f9f9; 
+            border-radius: 12px; 
+            font-family: 'Vazirmatn'; 
+            font-size: 14px; 
+            text-align: center; 
+            outline: none; 
+            transition: all 0.3s; 
+            direction: ltr; /* برای تایپ راحت‌تر اعداد */
+        }
+        .lg-input:focus { 
+            border-color: #00bcd4; 
+            background: #fff; 
+            box-shadow: 0 4px 10px rgba(0, 188, 212, 0.1); 
+        }
+        
+        .lg-btn { 
+            width: 100%; 
+            padding: 15px; 
+            background: linear-gradient(135deg, #00bcd4, #0097a7); 
+            color: white; 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 15px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: transform 0.2s; 
+            margin-top: 10px; 
+            font-family: 'Vazirmatn';
+        }
+        .lg-btn:active { transform: scale(0.98); opacity: 0.9; }
+        .lg-btn:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .toggle-link { 
+            font-size: 12px; 
+            color: #555; 
+            margin-top: 20px; 
+            cursor: pointer; 
+            padding: 10px;
+        }
+        .toggle-link span { color: #00bcd4; font-weight: bold; }
+        
+        .error-msg { 
+            background: #ffebee; 
+            color: #d32f2f; 
+            padding: 10px; 
+            border-radius: 8px; 
+            font-size: 11px; 
+            display: none; 
+            text-align: center; 
+            border: 1px solid #ffcdd2;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <div class="lg-logo"><span class="brand-j">J</span><span class="brand-l">L</span></div>
+        <h2 class="lg-title" id="formTitle">ورود به حساب</h2>
+        <p class="lg-sub">برای استفاده از خدمات آنلاین، شماره موبایل و رمز عبور خود را وارد کنید</p>
+
+        <div id="errorBox" class="error-msg"></div>
+
+        <input type="tel" id="phone" class="lg-input" placeholder="شماره موبایل (۰۹۱۲...)" maxlength="11">
+        <input type="password" id="password" class="lg-input" placeholder="رمز عبور (حداقل ۶ رقم)">
+        
+        <button class="lg-btn" onclick="handleAuth()" id="actionBtn">ورود</button>
+        
+        <div class="toggle-link" onclick="toggleMode()">
+            <span id="toggleText">حساب ندارید؟ ثبت نام کنید</span>
+        </div>
+    </div>
+
+    <!-- کتابخانه Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script>
+        // >>> اطلاعات سوپابیس خود را اینجا وارد کنید <<<
+        const SUPABASE_URL = 'https://ytledwlmnkxswaekavmr.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0bGVkd2xtbmt4c3dhZWthdm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyODY0MzQsImV4cCI6MjA4Mjg2MjQzNH0.aIrcPpb1EmRIcitLcsFYajM4yTOhnOU_RLEa33TIcOk';
+        
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        let isLoginMode = true; // پیش‌فرض روی حالت ورود است
+
+        // تبدیل اعداد فارسی به انگلیسی
+        function toEnglish(str) {
+            if(!str) return '';
+            return str.replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+        }
+
+        function toggleMode() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('formTitle').innerText = isLoginMode ? 'ورود به حساب' : 'ثبت نام کاربر جدید';
+            document.getElementById('actionBtn').innerText = isLoginMode ? 'ورود' : 'ثبت نام';
+            document.getElementById('toggleText').innerText = isLoginMode ? 'حساب ندارید؟ ثبت نام کنید' : 'حساب دارید؟ وارد شوید';
+            document.getElementById('errorBox').style.display = 'none';
+        }
+
+        async function handleAuth() {
+            const phoneVal = document.getElementById('phone').value;
+            const passVal = document.getElementById('password').value;
+            
+            // تمیزکاری ورودی‌ها (حذف فاصله و تبدیل عدد)
+            let phone = toEnglish(phoneVal).trim();
+            const password = toEnglish(passVal).trim();
+            
+            const errBox = document.getElementById('errorBox');
+            const btn = document.getElementById('actionBtn');
+
+            // اعتبارسنجی
+            if (phone.length !== 11 || !phone.startsWith('09')) {
+                showError("شماره موبایل معتبر نیست (مثال: 09123456789)");
+                return;
+            }
+            if (password.length < 6) {
+                showError("رمز عبور باید حداقل ۶ کاراکتر باشد");
+                return;
+            }
+
+            // ساخت ایمیل فیک برای سوپابیس (چون سوپابیس ایمیل می‌خواهد)
+            const fakeEmail = `${phone}@checkapp.local`;
+            
+            // شروع پردازش
+            btn.innerText = 'لطفاً صبر کنید...';
+            btn.disabled = true;
+            errBox.style.display = 'none';
+
+            let result;
+            
+            try {
+                if (isLoginMode) {
+                    // --- حالت ورود ---
+                    result = await sb.auth.signInWithPassword({
+                        email: fakeEmail,
+                        password: password
+                    });
+                } else {
+                    // --- حالت ثبت نام ---
+                    result = await sb.auth.signUp({
+                        email: fakeEmail,
+                        password: password,
+                        // آپشنال: ذخیره شماره در متادیتای کاربر
+                        options: {
+                            data: { phone: phone }
+                        }
+                    });
+                }
+
+                if (result.error) {
+                    let msg = result.error.message;
+                    // ترجمه خطاهای رایج
+                    if (msg.includes("Invalid login")) msg = "شماره موبایل یا رمز عبور اشتباه است.";
+                    if (msg.includes("already registered")) msg = "این شماره قبلاً ثبت شده است. لطفاً وارد شوید.";
+                    if (msg.includes("weak password")) msg = "رمز عبور ضعیف است.";
+                    
+                    showError(msg);
+                    btn.innerText = isLoginMode ? 'ورود' : 'ثبت نام';
+                    btn.disabled = false;
+                } else {
+                    // موفقیت -> انتقال به داشبورد
+                    // چک کردن سشن
+                    if (result.data.session) {
+                        window.location.href = 'index.html';
+                    } else {
+                        // اگر ثبت نام شد اما سشن نداد (مثلا تایید ایمیل روشن باشد)
+                        if(!isLoginMode) {
+                             // تلاش برای لاگین خودکار بعد از ثبت نام
+                             const loginRetry = await sb.auth.signInWithPassword({ email: fakeEmail, password: password });
+                             if(loginRetry.data.session) {
+                                 window.location.href = 'index.html';
+                             } else {
+                                 showError("ثبت نام انجام شد. لطفاً وارد شوید.");
+                                 toggleMode(); // برو به حالت ورود
+                                 btn.innerText = 'ورود';
+                                 btn.disabled = false;
+                             }
+                        }
+                    }
+                }
+            } catch (error) {
+                showError("خطای ارتباط با سرور. اینترنت خود را بررسی کنید.");
+                console.error(error);
+                btn.innerText = isLoginMode ? 'ورود' : 'ثبت نام';
+                btn.disabled = false;
+            }
+        }
+
+        function showError(msg) {
+            const box = document.getElementById('errorBox');
+            box.innerText = msg;
+            box.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

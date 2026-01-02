@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>گزارشات</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-right"><i class="fa-solid fa-ellipsis-vertical" onclick="openSideMenu()"></i></div>
+        <div class="header-center"><h1>گزارشات</h1></div>
+        <div class="header-left"></div>
+    </header>
+
+    <main class="app-content" id="reportContainer">
+        <div class="report-header-sum"><div class="report-label">جمع کل در انتظار</div><div class="report-big-num" id="reportTotalSum">...</div></div>
+        <div style="font-weight:bold;margin-bottom:10px;color:#555">وضعیت ماهانه و هفتگی</div>
+        <div class="report-scroll-container" id="reportScrollContainer"></div>
+        <div class="spacer"></div>
+    </main>
+
+    <div id="sideMenuOverlay" class="side-menu-overlay" onclick="closeSideMenu()"></div>
+    <div id="sideMenu" class="side-menu">
+        <div class="side-menu-header"><i class="fa-solid fa-user"></i> منو</div>
+        <div class="side-menu-item" onclick="openCounterpartyListMode()"><i class="fa-solid fa-address-book"></i> طرف حساب‌ها</div>
+        <div class="side-menu-item" onclick="document.getElementById('excelFileInput').click()"><i class="fa-solid fa-file-import"></i> ورود اکسل</div>
+        <div class="side-menu-item" onclick="exportToExcel()"><i class="fa-solid fa-file-export"></i> خروجی اکسل</div>
+        <div class="side-menu-item" onclick="backupToGoogle()"><i class="fa-solid fa-cloud-arrow-up"></i> بکاپ ابری</div>
+        <div class="side-menu-item" onclick="restoreFromGoogle()"><i class="fa-solid fa-cloud-arrow-down"></i> بازیابی ابری</div>
+        <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none" onchange="processExcelFile(this)">
+    </div>
+
+    <div id="counterpartyModal" class="modal-overlay" style="align-items:flex-end;"><div class="modal-content modal-full-screen" style="height:100vh; border-radius:0;"><div class="modal-header"><span>طرف حساب</span><i class="fa-solid fa-plus" style="float:left;cursor:pointer" onclick="document.getElementById('addCounterpartyModal').style.display='flex'"></i><i class="fa-solid fa-arrow-down" style="float:right;cursor:pointer" onclick="document.getElementById('counterpartyModal').style.display='none'"></i></div><div class="cp-search-box"><input type="text" id="cpSearchInput" class="search-input" placeholder="جستجو..." onkeyup="searchCounterparty()"></div><div id="counterpartyList" class="modal-body" style="height:calc(100vh - 120px);overflow:auto"></div></div></div>
+    
+    <div id="addCounterpartyModal" class="modal-overlay" style="z-index:5500"><div class="modal-content"><div class="modal-header">طرف حساب جدید</div><div class="modal-body cp-add-form"><input id="newCpName" class="cp-input" placeholder="نام و نام خانوادگی"><input id="newCpNationalId" class="cp-input" placeholder="کد / شناسه ملی" inputmode="numeric"><input id="newCpPhone" class="cp-input" placeholder="شماره تماس" inputmode="numeric"></div><div class="modal-footer" style="display:flex;gap:10px"><button class="close-modal-btn" style="flex:1" onclick="document.getElementById('addCounterpartyModal').style.display='none'">انصراف</button><button class="action-btn-full" style="flex:1" onclick="saveNewCounterparty()">ذخیره</button></div></div></div>
+    
+    <div id="backupListModal" class="modal-overlay"><div class="modal-content"><div class="modal-header">انتخاب بکاپ</div><div id="backupListContainer" class="modal-body" style="max-height:60vh;overflow:auto;padding:10px"></div><div class="modal-footer"><button class="action-btn-full" onclick="document.getElementById('backupListModal').style.display='none'">بستن</button></div></div></div>
+
+    <nav class="bottom-navigation">
+        <div class="nav-item" onclick="openSideMenu()"><i class="fa-solid fa-ellipsis"></i><span>بیشتر</span></div>
+        <a href="index.html" class="nav-item"><i class="fa-solid fa-bars-staggered"></i><span>داشبورد</span></a>
+        <div class="nav-item-middle"><div class="fab-border-fix"><a href="add-check.html" class="fab-btn"><i class="fa-solid fa-plus"></i></a></div></div>
+        <a href="check-list.html" class="nav-item"><i class="fa-solid fa-list-check"></i><span>چک ها</span></a>
+        <a href="report.html" class="nav-item active-nav"><i class="fa-solid fa-chart-pie"></i><span>گزارش</span></a>
+    </nav>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

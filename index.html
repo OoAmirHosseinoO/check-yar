@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>یادآور چک</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-right"><i class="fa-solid fa-ellipsis-vertical" onclick="openSideMenu()"></i></div>
+        <div class="header-center"><h1>یادآور چک</h1></div>
+        <div class="header-left"></div>
+    </header>
+
+    <main class="app-content">
+        <div class="card">
+            <div class="card-content row-layout">
+                <div class="logo-box"><span class="logo-j">J</span><span class="logo-l">L</span></div>
+                <div class="date-box" id="currentDateText">...</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-content row-layout">
+                <div class="status-right-section" onclick="document.getElementById('scanCheckInput').click()">
+                    <i class="fa-solid fa-qrcode qr-icon"></i>
+                    <div class="text-col"><span class="bold-text">ورود چک صیاد</span><span class="small-text">با هوش مصنوعی <i class="fa-solid fa-wand-magic-sparkles" style="color:#ffa000"></i></span></div>
+                    <input type="file" id="scanCheckInput" accept="image/*" style="display:none" onchange="handleSmartScan(this)">
+                </div>
+                <div class="divider"></div>
+                <div class="status-left-section">
+                    <div class="alert-item"><div class="badge red-badge">!</div><span class="blue-text" id="overdueCount">... فقره سررسید</span></div>
+                    <div class="alert-item"><div class="badge green-badge"><i class="fa-solid fa-check"></i></div><span class="blue-text">آخرین بکاپ: <span id="lastBackupText" style="color:#555;font-weight:normal;font-size:10px">...</span></span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card buttons-card">
+            <div class="card-content row-layout space-between">
+                <a href="check-list.html?filter=all" class="circle-item"><div class="big-icon-circle btn-blue"><i class="fa-solid fa-list-check"></i></div><span class="c-title">همه چک ها</span><span class="c-sub" id="countAll">...</span></a>
+                <a href="check-list.html?filter=pay" class="circle-item"><div class="big-icon-circle btn-red"><i class="fa-solid fa-arrow-up"></i></div><span class="c-title">پرداختی</span><span class="c-sub" id="countPay">...</span></a>
+                <a href="check-list.html?filter=receive" class="circle-item"><div class="big-icon-circle btn-green"><i class="fa-solid fa-arrow-down"></i></div><span class="c-title">دریافتی</span><span class="c-sub" id="countRec">...</span></a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-content p-0 calendar-card-body">
+                <div class="calendar-grid" id="dashboardCalendarGrid"></div>
+                <div class="calendar-legend">
+                    <div class="legend-head">گردش<br>ماهانه</div>
+                    <div class="l-row"><span>صفر</span><span class="dot d0"></span></div>
+                    <div class="l-row"><span>کم</span><span class="dot d1"></span></div>
+                    <div class="l-row"><span>متوسط</span><span class="dot d2"></span></div>
+                    <div class="l-row"><span>زیاد</span><span class="dot d3"></span></div>
+                </div>
+            </div>
+        </div>
+        <div class="spacer"></div>
+    </main>
+
+    <div id="monthDetailsModal" class="modal-overlay">
+        <div class="details-card">
+            <div class="dc-body">
+                <div class="dc-header"><div class="dc-badge"><span class="dc-m" id="mdMonthName">...</span><span class="dc-y" id="mdYear">...</span></div><div class="dc-title">گردش ماهانه</div></div>
+                <div class="dc-stats">
+                    <div class="dc-row"><span>تعداد:</span><span class="dc-val" id="mdCount">...</span></div>
+                    <div class="dc-row"><span>دریافتی:</span><span class="dc-val" id="mdRec">...</span></div>
+                    <div class="dc-row"><span>پرداختی:</span><span class="dc-val" id="mdPay">...</span></div>
+                    <div class="dc-row"><span>مانده:</span><span class="dc-val text-danger" id="mdBalance">...</span></div>
+                </div>
+                <div class="dc-weeks" id="mdWeeksContainer"></div>
+            </div>
+            <div class="dc-actions"><button class="dc-btn" onclick="closeMonthModal()">لغو</button><button class="dc-btn dc-btn-view" id="btnViewMonthList">مشاهده لیست</button></div>
+        </div>
+    </div>
+
+    <div id="sideMenuOverlay" class="side-menu-overlay" onclick="closeSideMenu()"></div>
+    <div id="sideMenu" class="side-menu">
+        <div class="side-menu-header"><i class="fa-solid fa-user"></i> منو</div>
+        <div class="side-menu-item" onclick="openCounterpartyListMode()"><i class="fa-solid fa-address-book"></i> طرف حساب‌ها</div>
+        <div class="side-menu-item" onclick="document.getElementById('excelFileInput').click()"><i class="fa-solid fa-file-import"></i> ورود اکسل</div>
+        <div class="side-menu-item" onclick="exportToExcel()"><i class="fa-solid fa-file-export"></i> خروجی اکسل</div>
+        <div class="side-menu-item" onclick="backupToGoogle()"><i class="fa-solid fa-cloud-arrow-up"></i> بکاپ ابری</div>
+        <div class="side-menu-item" onclick="restoreFromGoogle()"><i class="fa-solid fa-cloud-arrow-down"></i> بازیابی ابری</div>
+        <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none" onchange="processExcelFile(this)">
+    </div>
+    
+    <div id="counterpartyModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>طرف حساب</span><i class="fa-solid fa-xmark" onclick="document.getElementById('counterpartyModal').style.display='none'" style="float:left"></i></div><div class="modal-body" id="counterpartyList" style="max-height:60vh;overflow:auto"></div></div></div>
+    <div id="backupListModal" class="modal-overlay"><div class="modal-content"><div class="modal-header">انتخاب بکاپ</div><div id="backupListContainer" style="max-height:60vh;overflow:auto;padding:10px"></div><div class="modal-footer"><button class="action-btn-full" onclick="document.getElementById('backupListModal').style.display='none'">بستن</button></div></div></div>
+
+    <nav class="bottom-navigation">
+        <div class="nav-item" onclick="openSideMenu()"><i class="fa-solid fa-ellipsis"></i><span>بیشتر</span></div>
+        <a href="index.html" class="nav-item active-nav"><i class="fa-solid fa-bars-staggered"></i><span>داشبورد</span></a>
+        <div class="nav-item-middle"><div class="fab-border-fix"><a href="add-check.html" class="fab-btn"><i class="fa-solid fa-plus"></i></a></div></div>
+        <a href="check-list.html" class="nav-item"><i class="fa-solid fa-list-check"></i><span>چک ها</span></a>
+        <a href="report.html" class="nav-item"><i class="fa-solid fa-chart-pie"></i><span>گزارش</span></a>
+    </nav>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
