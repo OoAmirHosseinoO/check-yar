@@ -1,5 +1,5 @@
 // ============================================================
-// app.js - FINAL (Excel Import Fixed & Menu Cleaned)
+// app.js - FINAL VERSION (Auto-Add Counterparty + Rial)
 // ============================================================
 
 // >>> 1. تنظیمات SUPABASE <<<
@@ -11,7 +11,7 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxt8Yq0cCeyze
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// --- متغیرهای سراسری ---
+// --- Global Vars ---
 let currentType = 'pay';
 let selectedCheckId = null;
 let editingCheckId = null;
@@ -154,16 +154,7 @@ function toPersianDigits(s) { return !s&&s!==0?'':s.toString().replace(/\d/g,d=>
 function toEnglishDigits(s) { return !s&&s!==0?'':s.toString().replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)); }
 function getMonthName(i) { return ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"][parseInt(i)-1]||""; }
 function getBankNameFA(c) { const n={'meli':'بانک ملی','mellat':'بانک ملت','sepah':'بانک سپه','tejarat':'بانک تجارت','saderat':'بانک صادرات','saman':'بانک سامان','pasargad':'بانک پاسارگاد','refah':'بانک رفاه کارگران','maskan':'بانک مسکن','keshavarzi':'بانک کشاورزی','parsian':'بانک پارسیان','en':'بانک اقتصاد نوین','resalat':'بانک رسالت','shahr':'بانک شهر','ansar':'بانک انصار','dey':'بانک دی','sina':'بانک سینا','post':'پست بانک','tosee':'توسعه تعاون','ayandeh':'بانک آینده'}; return n[c]||'بانک نامشخص'; }
-
-// LOGO FUNCTION - Local Files
-function getBankLogoSrc(code) {
-    const validCodes = ['meli','mellat','sepah','tejarat','saderat','saman','pasargad','refah','maskan','keshavarzi','parsian','en','resalat','shahr','ansar','dey','sina','post','tosee','ayandeh'];
-    if (validCodes.includes(code)) {
-        return `./logos/${code}.png`;
-    }
-    return `./logos/default.png`;
-}
-
+function getBankLogoSrc(c) { return `./logos/${c}.png`; } 
 function getDateScore(s) { if(!s)return 9e7; const p=toEnglishDigits(s).split('/'); if(p.length!==3)return 9e7; return parseInt(p[0])*10000+parseInt(p[1])*100+parseInt(p[2]); }
 
 function getStatusInfo(s) {
@@ -199,14 +190,10 @@ function showLoading(m) {
 }
 function hideLoading() { const l=document.getElementById('loadingModal'); if(l)l.style.display='none'; }
 
-
-// ============================================================
-// [SECTION 3] DATE ALGORITHMS & CALENDAR
-// ============================================================
+// --- Date Algo ---
 function gregorianToJalaali(gy,gm,gd){var g_d_m=[0,31,59,90,120,151,181,212,243,273,304,334];var gy2=(gm>2)?(gy+1):gy;var days=355666+(365*gy)+parseInt((gy2+3)/4)-parseInt((gy2+99)/100)+parseInt((gy2+399)/400)+gd+g_d_m[gm-1];var jy=-1595+(33*parseInt(days/12053));days%=12053;jy+=4*parseInt(days/1461);days%=1461;if(days>365){jy+=parseInt((days-1)/365);days=(days-1)%365;}var jm,jd;if(days<186){jm=1+parseInt(days/31);jd=1+(days%31);}else{jm=7+parseInt((days-186)/30);jd=1+((days-186)%30);}return[jy,jm,jd];}
 function jalaaliToGregorian(jy,jm,jd){jy+=1595;var days=-355668+(365*jy)+(parseInt(jy/33)*8)+parseInt(((jy%33)+3)/4)+jd+((jm<7)?(jm-1)*31:((jm-7)*30)+186);var gy=400*parseInt(days/146097);days%=146097;if(days>36524){gy+=100*parseInt(--days/36524);days%=36524;if(days>=365)days++;}gy+=4*parseInt(days/1461);days%=1461;if(days>365){gy+=parseInt((days-1)/365);days=(days-1)%365;}var gd=days+1;var sal_a=[0,31,((gy%4==0&&gy%100!=0)||(gy%400==0))?29:28,31,30,31,30,31,31,30,31,30,31];var gm;for(gm=0;gm<13;gm++){var v=sal_a[gm];if(gd<=v)break;gd-=v;}return[gy,gm,gd];}
 function getTodayJalaali(){const n=new Date();return gregorianToJalaali(n.getFullYear(),n.getMonth()+1,n.getDate());}
-
 function openCustomCalendar(id) { activeDateInputId=id; document.getElementById('customCalendarModal').style.display='flex'; const [y,m,d]=getTodayJalaali(); const v=document.getElementById(id).value; if(v&&v.split('/').length===3){const p=toEnglishDigits(v).split('/');calSelectedYear=parseInt(p[0]);calSelectedMonth=parseInt(p[1]);calSelectedDay=parseInt(p[2]);calViewingYear=calSelectedYear;calViewingMonth=calSelectedMonth;}else{calViewingYear=y;calViewingMonth=m;calSelectedYear=y;calSelectedMonth=m;calSelectedDay=d;} calViewMode='days'; updateCalendarView(); updatePickerDisplay(); }
 function closeCalendarModal() { document.getElementById('customCalendarModal').style.display='none'; }
 function confirmDateSelection() { if(calSelectedYear){const m=calSelectedMonth<10?'0'+calSelectedMonth:calSelectedMonth; const d=calSelectedDay<10?'0'+calSelectedDay:calSelectedDay; document.getElementById(activeDateInputId).value=toPersianDigits(`${calSelectedYear}/${m}/${d}`); closeCalendarModal();} }
@@ -225,10 +212,34 @@ function openSideMenu() { document.getElementById('sideMenuOverlay').style.displ
 function closeSideMenu() { document.getElementById('sideMenu').classList.remove('open'); document.getElementById('sideMenuOverlay').style.opacity='0'; setTimeout(()=>{document.getElementById('sideMenuOverlay').style.display='none';},300); }
 function openCounterpartyListMode() { closeSideMenu(); openCounterpartyModal(true); }
 
-// *** اصلاح شده برای ورود از اکسل ***
-// ============================================
-// نسخه هوشمند و خطایاب ورود اکسل
-// ============================================
+async function exportToExcel() {
+    closeSideMenu(); showLoading("ایجاد فایل اکسل...");
+    try {
+        const allChecksList = await fetchChecks();
+        if (allChecksList.length === 0) { alert("داده‌ای نیست"); hideLoading(); return; }
+        
+        const excelRows = allChecksList.map(check => ({
+            "مبلغ (ریال)": check.amount, // تغییر به ریال
+            "تاریخ سررسید": check.date,
+            "نوع چک": check.type === 'pay' ? 'پرداختی' : 'دریافتی',
+            "طرف حساب": check.payTo,
+            "نام بانک": getBankNameFA(check.bank),
+            "وضعیت": getStatusInfo(check.status).text,
+            "شماره چک": check.checkNum,
+            "شناسه صیاد": check.sayadNum,
+            "توضیحات": check.desc
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(excelRows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Checks");
+        const [currY, currM, currD] = getTodayJalaali();
+        XLSX.writeFile(wb, `CheckList_${currY}-${currM}-${currD}.xlsx`);
+        
+    } catch (e) { alert(e.message); } finally { hideLoading(); }
+}
+
+// --- IMPORTANT: Excel Import with Auto-Add Counterparty ---
 async function processExcelFile(inp) { 
     const file = inp.files[0];
     if (!file) return;
@@ -241,72 +252,61 @@ async function processExcelFile(inp) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheet = workbook.SheetNames[0];
-            // defval: "" باعث میشود سلولهای خالی را هم بخواند تا ستون ها جابجا نشوند
             const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], { defval: "" });
             
             if (jsonData.length === 0) throw new Error("فایل اکسل خالی است");
 
             let checksToAdd = [];
-            
-            // --- الگوریتم تشخیص ستون‌ها ---
+            let newCounterparties = new Set(); // لیستی برای نام‌های جدید
+
+            // دریافت لیست فعلی طرف حساب‌ها برای مقایسه
+            const existingCPs = await fetchCounterparties();
+            const existingNames = existingCPs.map(cp => cp.name.trim());
+
             for (let row of jsonData) {
-                // تمام کلیدهای (سرستون‌های) این ردیف را میگیریم
                 const keys = Object.keys(row);
-
-                // 1. پیدا کردن ستون مبلغ (حساس نبودن به فاصله و کلمات اضافه)
                 const keyAmount = keys.find(k => k.trim().includes('مبلغ') || k.includes('قیمت') || k.toLowerCase().includes('amount') || k.includes('ریال') || k.includes('تومان'));
-                
-                // 2. پیدا کردن ستون تاریخ
                 const keyDate = keys.find(k => k.trim().includes('تاریخ') || k.toLowerCase().includes('date') || k.includes('سررسید') || k.includes('زمان'));
-
-                // 3. پیدا کردن سایر ستون‌ها
                 const keyName = keys.find(k => k.trim().includes('وجه') || k.trim().includes('نام') || k.toLowerCase().includes('name') || k.includes('گیرنده'));
                 const keyType = keys.find(k => k.trim().includes('نوع') || k.toLowerCase().includes('type'));
                 const keyNum = keys.find(k => k.trim().includes('شماره') || k.toLowerCase().includes('no') || k.toLowerCase().includes('num'));
                 const keySayad = keys.find(k => k.trim().includes('صیاد') || k.toLowerCase().includes('sayad'));
                 const keyDesc = keys.find(k => k.trim().includes('توضیح') || k.toLowerCase().includes('desc') || k.includes('بابت'));
 
-                // --- استخراج و تمیزکاری داده‌ها ---
-                
-                // مبلغ
                 let rawAmount = keyAmount ? row[keyAmount] : 0;
                 let amount = 0;
                 if(rawAmount) {
-                    // تبدیل به رشته، حذف ویرگول، تبدیل اعداد فارسی به انگلیسی
                     let s = rawAmount.toString().replace(/,/g, '').trim();
                     s = toEnglishDigits(s);
                     amount = parseInt(s);
                 }
 
-                // تاریخ
                 let rawDate = keyDate ? row[keyDate] : '';
                 let dateStr = '';
                 if(rawDate) {
-                    // تبدیل به رشته و انگلیسی کردن اعداد
                     dateStr = toEnglishDigits(rawDate.toString().trim());
-                    
-                    // نکته مهم: اگر اکسل فرمت تاریخ میلادی داده باشد (مثلا 45200)، ما نادیده میگیریم
-                    // چون تبدیلش پیچیده است. کاربر باید متنی بنویسد (1403/01/01)
-                    // اما سعی میکنیم اسلش ها را درست کنیم
                     if(dateStr.includes('-')) dateStr = dateStr.replace(/-/g, '/');
                 }
 
-                // شرط اعتبار: حتما مبلغ و تاریخ داشته باشد
-                // تاریخ باید حداقل 6 کاراکتر باشد (مثلا 140301)
                 if (amount > 0 && dateStr.length >= 6) {
-                    
-                    // تشخیص نوع (پیش‌فرض پرداختی)
                     let type = 'pay';
                     if (keyType) {
                         let tVal = row[keyType].toString();
                         if(tVal.includes('دریافت') || tVal.toLowerCase().includes('rec')) type = 'receive';
                     }
 
+                    const payToName = keyName ? row[keyName].toString().trim() : '';
+
+                    // اگر نام طرف حساب وجود داشت و قبلاً در دیتابیس نبود، به لیست افزودن اضافه کن
+                    if (payToName && !existingNames.includes(payToName)) {
+                        newCounterparties.add(payToName);
+                    }
+
                     checksToAdd.push({
                         amount: amount,
                         date: dateStr,
                         type: type,
-                        payTo: keyName ? row[keyName].toString().trim() : '',
+                        payTo: payToName,
                         desc: keyDesc ? row[keyDesc].toString().trim() : '',
                         checkNum: keyNum ? toEnglishDigits(row[keyNum].toString().trim()) : '',
                         sayadNum: keySayad ? toEnglishDigits(row[keySayad].toString().trim()) : '',
@@ -317,20 +317,26 @@ async function processExcelFile(inp) {
                 }
             }
 
+            // 1. اول طرف حساب‌های جدید را اضافه کن
+            if (newCounterparties.size > 0) {
+                const cpArray = Array.from(newCounterparties).map(name => ({ name: name, nationalId: '', phone: '' }));
+                const { error: cpError } = await sb.from('counterparties').insert(cpArray);
+                if (cpError) console.error("CP Import Error", cpError);
+            }
+
+            // 2. بعد چک‌ها را اضافه کن
             if (checksToAdd.length > 0) {
-                // ارسال به Supabase
                 const { error } = await sb.from('checks').insert(checksToAdd);
                 if (error) throw error;
-                
-                alert(`${checksToAdd.length} فقره چک با موفقیت شناسایی و وارد شد.`);
+                alert(`${checksToAdd.length} فقره چک و طرف حساب‌های جدید وارد شدند.`);
                 location.reload();
             } else {
-                alert("اکسل خوانده شد اما هیچ چک معتبری پیدا نشد!\n\nنکات مهم:\n۱. ستون 'مبلغ' و 'تاریخ' الزامی است.\n۲. تاریخ را به صورت متنی بنویسید (مثلاً 1403/05/20).");
+                alert("هیچ چک معتبری یافت نشد. ستون مبلغ و تاریخ الزامی است.");
             }
 
         } catch (err) {
             console.error(err);
-            alert("خطا در خواندن فایل: " + err.message);
+            alert("خطا: " + err.message);
         } finally {
             hideLoading();
             inp.value = '';
@@ -339,26 +345,6 @@ async function processExcelFile(inp) {
     reader.readAsArrayBuffer(file);
 }
 
-async function exportToExcel() {
-    closeSideMenu(); showLoading("ایجاد فایل اکسل...");
-    try {
-        const allChecksList = await fetchChecks();
-        if (allChecksList.length === 0) { alert("داده‌ای نیست"); hideLoading(); return; }
-        
-        const excelRows = allChecksList.map(check => ({
-            "مبلغ (تومان)": check.amount, "تاریخ سررسید": check.date, "نوع چک": check.type === 'pay' ? 'پرداختی' : 'دریافتی',
-            "طرف حساب": check.payTo, "بانک": getBankNameFA(check.bank), "وضعیت": getStatusInfo(check.status).text,
-            "شماره چک": check.checkNum, "شناسه صیاد": check.sayadNum, "توضیحات": check.desc
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(excelRows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Checks");
-        const [currY, currM, currD] = getTodayJalaali();
-        XLSX.writeFile(wb, `CheckList_${currY}-${currM}-${currD}.xlsx`);
-        
-    } catch (e) { alert(e.message); } finally { hideLoading(); }
-}
 
 // --- Dashboard ---
 async function loadDashboardData() {
@@ -400,10 +386,10 @@ async function openMonthDetails(year, month) {
     document.getElementById('mdMonthName').innerText = getMonthName(month);
     document.getElementById('mdYear').innerText = toPersianDigits(year);
     document.getElementById('mdCount').innerText = `${toPersianDigits(count)} فقره`;
-    document.getElementById('mdRec').innerText = `${toPersianDigits(sumRec.toLocaleString())} تومان`;
-    document.getElementById('mdPay').innerText = `${toPersianDigits(sumPay.toLocaleString())} تومان`;
+    document.getElementById('mdRec').innerText = `${toPersianDigits(sumRec.toLocaleString())} ریال`; // ریال
+    document.getElementById('mdPay').innerText = `${toPersianDigits(sumPay.toLocaleString())} ریال`; // ریال
     const balEl = document.getElementById('mdBalance');
-    balEl.innerText = `${toPersianDigits(Math.abs(balance).toLocaleString())} تومان ${balance<0?'(بدهکار)':'(تراز)'}`;
+    balEl.innerText = `${toPersianDigits(Math.abs(balance).toLocaleString())} ریال ${balance<0?'(بدهکار)':'(تراز)'}`;
     balEl.className = balance < 0 ? 'dc-val text-danger' : 'dc-val';
     const wContainer = document.getElementById('mdWeeksContainer'); wContainer.innerHTML = '';
     const wNames = ['اول', 'دوم', 'سوم', 'چهارم', 'پنجم'];
@@ -443,7 +429,8 @@ async function renderCheckList() {
         let h=`<div class="month-group"><div class="month-header-dynamic" onclick="toggleMonthGroup('${gn}')"><i id="arrow-${gn}" class="fa-solid fa-chevron-down arrow-icon"></i><span class="month-title">${getMonthName(gm)} ${toPersianDigits(gy)}</span></div><div id="${gn}" class="month-content">`;
         g[k].forEach(x=>{
             const s=getStatusInfo(x.status); const ex=`${x.colorTag&&x.colorTag!=='none'?`<span class="chk-color-tag-inline" style="background:${x.colorTag}"></span>`:''} ${x.frontImage||x.backImage?'<i class="fa-solid fa-image chk-img-icon"></i>':''}`;
-            h+=`<div class="check-item-card" onclick="window.location.href='add-check.html?id=${x.id}'"><div class="chk-right"><div class="logo-wrapper"><img src="${getBankLogoSrc(x.bank)}" class="bank-logo-img"></div><div class="chk-details"><div class="chk-date"><span>${toPersianDigits(x.date)}</span><span class="type-badge ${x.type==='pay'?'t-pay':'t-rec'}">(${x.type==='pay'?'پرداختی':'دریافتی'})</span>${ex}</div><div class="chk-desc">${x.payTo}</div></div></div><div class="chk-left"><div class="status-clickable" style="color:${s.color};background:${s.bg}" onclick="openStatusModal('${x.id}', event)">${s.text}</div><div class="amount-text">${toPersianDigits(parseInt(x.amount).toLocaleString())} <span class="currency">تومان</span></div></div></div>`;
+            // استفاده از لوگوی لوکال
+            h+=`<div class="check-item-card" onclick="window.location.href='add-check.html?id=${x.id}'"><div class="chk-right"><div class="logo-wrapper"><img src="${getBankLogoSrc(x.bank)}" class="bank-logo-img"></div><div class="chk-details"><div class="chk-date"><span>${toPersianDigits(x.date)}</span><span class="type-badge ${x.type==='pay'?'t-pay':'t-rec'}">(${x.type==='pay'?'پرداختی':'دریافتی'})</span>${ex}</div><div class="chk-desc">${x.payTo}</div></div></div><div class="chk-left"><div class="status-clickable" style="color:${s.color};background:${s.bg}" onclick="openStatusModal('${x.id}', event)">${s.text}</div><div class="amount-text">${toPersianDigits(parseInt(x.amount).toLocaleString())} <span class="currency">ریال</span></div></div></div>`;
         });
         h+='</div></div>'; con.innerHTML+=h;
     });
@@ -462,12 +449,7 @@ function setupAddCheckPage() {
     if(p.get('id')){
         editingCheckId=p.get('id'); document.getElementById('pageTitle').innerText="ویرایش چک"; document.getElementById('deleteCheckBtn').style.display='flex'; loadCheckDataForEdit(editingCheckId);
     } else {
-        const statusDisp = document.getElementById('inputStatusDisplay');
-        statusDisp.value='در انتظار';
-        statusDisp.style.color='#ffa000'; // Default Orange
-        statusDisp.style.fontWeight='bold';
-        document.getElementById('inputStatusValue').value='pending';
-        
+        const d=document.getElementById('inputStatusDisplay'); d.value='در انتظار'; d.style.color='#ffa000'; d.style.fontWeight='bold'; document.getElementById('inputStatusValue').value='pending';
         if(document.getElementById('inputIssueDate')) document.getElementById('inputIssueDate').value=toPersianDigits(`${ty}/${tm<10?'0'+tm:tm}/${td<10?'0'+td:td}`); selectedColor='none';
         if(p.get('mode')==='scan'){
             const s=JSON.parse(localStorage.getItem('scannedCheckData')||'{}'); if(s.sayad)document.getElementById('sayadNum').value=toPersianDigits(s.sayad); if(s.date)document.getElementById('inputDate').value=toPersianDigits(s.date); if(s.amount)document.getElementById('inputAmount').value=toPersianDigits(parseInt(s.amount).toLocaleString()); if(s.image){frontImageBase64=s.image; updateImageBox('areaFront',s.image);} localStorage.removeItem('scannedCheckData'); document.getElementById('pageTitle').innerText="چک اسکن شده";
@@ -493,13 +475,7 @@ async function loadCheckDataForEdit(id) {
     const checks = await fetchChecks();
     const c = checks.find(x => x.id == id); if(!c) return;
     document.getElementById('inputAmount').value=toPersianDigits(parseInt(c.amount).toLocaleString()); document.getElementById('inputDate').value=toPersianDigits(c.date); document.getElementById('inputIssueDate').value=toPersianDigits(c.issueDate||''); document.getElementById('inputPayTo').value=c.payTo; document.getElementById('inputBankValue').value=c.bank; document.getElementById('inputBankDisplay').value=getBankNameFA(c.bank); document.getElementById('inputStatusValue').value=c.status;
-    
-    const i=getStatusInfo(c.status); 
-    const d=document.getElementById('inputStatusDisplay'); 
-    d.value=i.text; 
-    d.style.color=i.color; 
-    d.style.fontWeight='bold';
-    
+    const i=getStatusInfo(c.status); const d=document.getElementById('inputStatusDisplay'); d.value=i.text; d.style.color=i.color; d.style.fontWeight='bold';
     document.getElementById('checkNum').value=toPersianDigits(c.checkNum||''); document.getElementById('sayadNum').value=toPersianDigits(c.sayadNum||''); document.getElementById('inputDesc').value=c.desc||''; selectedColor=c.colorTag||'none'; document.querySelectorAll('.color-circle').forEach(x=>{x.classList.remove('selected-color'); if(x.getAttribute('data-color')===selectedColor)x.classList.add('selected-color');});
     if(c.frontImage){frontImageBase64=c.frontImage; updateImageBox('areaFront',c.frontImage);}else updateImageBox('areaFront',null); if(c.backImage){backImageBase64=c.backImage; updateImageBox('areaBack',c.backImage);}else updateImageBox('areaBack',null);
     currentType=c.type; if(c.type==='pay')updateTypeUI('typePay','typeReceive'); else updateTypeUI('typeReceive','typePay');
@@ -508,28 +484,23 @@ async function deleteCheck(id) { await dbDeleteCheck(id); alert('حذف شد'); 
 function updateTypeUI(a,i) { document.getElementById(a).classList.add('active-type'); document.getElementById(i).classList.remove('active-type'); document.getElementById(a).style.color='#333'; document.getElementById(i).style.color='#bbb'; }
 function openBankModal(){document.getElementById('bankModal').style.display='flex'; const c=document.getElementById('bankListContainer'); c.innerHTML=''; 
     const bks=[{code:'meli',name:'بانک ملی'},{code:'mellat',name:'بانک ملت'},{code:'sepah',name:'بانک سپه'},{code:'tejarat',name:'بانک تجارت'},{code:'saderat',name:'بانک صادرات'},{code:'saman',name:'بانک سامان'},{code:'pasargad',name:'بانک پاسارگاد'},{code:'refah',name:'بانک رفاه'},{code:'maskan',name:'بانک مسکن'},{code:'keshavarzi',name:'بانک کشاورزی'},{code:'parsian',name:'بانک پارسیان'},{code:'en',name:'اقتصاد نوین'},{code:'resalat',name:'قرض‌الحسنه رسالت'},{code:'shahr',name:'بانک شهر'},{code:'ansar',name:'بانک انصار'},{code:'dey',name:'بانک دی'},{code:'sina',name:'بانک سینا'},{code:'post',name:'پست بانک'},{code:'tosee',name:'توسعه تعاون'},{code:'ayandeh',name:'بانک آینده'}];
-    bks.forEach(b=>{c.innerHTML+=`<div class="bank-option" onclick="selectBank('${b.code}')"><img src="${getBankLogoSrc(b.code)}"><span>${b.name}</span></div>`});
+    bks.forEach(b=>{c.innerHTML+=`<div class="bank-option" onclick="selectBank('${b.code}')"><img src="${getBankLogoSrc(b.code)}" onerror="this.src='./logos/default.png'"><span>${b.name}</span></div>`});
 }
 function selectBank(b){document.getElementById('inputBankValue').value=b; document.getElementById('inputBankDisplay').value=getBankNameFA(b); document.getElementById('bankModal').style.display='none';}
 function openStatusSelectionModal(){document.getElementById('statusSelectionModal').style.display='flex';}
-
-function selectStatus(v,t,c){
-    document.getElementById('inputStatusValue').value=v; 
-    const d=document.getElementById('inputStatusDisplay'); 
-    d.value=t; 
-    d.style.color=c; 
-    d.style.fontWeight='bold'; 
-    document.getElementById('statusSelectionModal').style.display='none';
-}
-
-function openCounterpartyModal(e=false){isCpEditMode=e; document.getElementById('counterpartyModal').style.display='flex'; renderCounterpartyList(); }
+function selectStatus(v,t,c){document.getElementById('inputStatusValue').value=v; const d=document.getElementById('inputStatusDisplay'); d.value=t; d.style.color=c; d.style.fontWeight='bold'; document.getElementById('statusSelectionModal').style.display='none';}
+function openCounterpartyModal(e=false){isCpEditMode=e; document.getElementById('counterpartyModal').style.display='flex'; renderCounterpartyList();}
 async function renderCounterpartyList() {
-    const l=await fetchCounterparties(); const c=document.getElementById('counterpartyList'); c.innerHTML=''; if(l.length===0){c.innerHTML='<div style="text-align:center;padding:30px;color:#999">لیست خالی است</div>';return;}
-    l.forEach(p=>{
+    const l=await fetchCounterparties(); const c=document.getElementById('counterpartyList'); c.innerHTML=''; 
+    const searchVal = document.getElementById('cpSearchInput') ? document.getElementById('cpSearchInput').value : '';
+    const fl = l.filter(p => p.name.includes(searchVal));
+    if(fl.length===0){c.innerHTML='<div style="text-align:center;padding:30px;color:#999">لیست خالی است</div>';return;}
+    fl.forEach(p=>{
         const act=isCpEditMode?`editCp('${p.id}','${p.name}','${p.phone}')`:`selectCp('${p.name}')`;
         c.innerHTML+=`<div class="cp-item" onclick="${act}"><div class="cp-avatar"><i class="fa-regular fa-user"></i></div><div class="cp-info"><span class="cp-name">${p.name}</span><span class="cp-phone">${p.phone?toPersianDigits(p.phone):'بدون شماره'}</span></div>${isCpEditMode?'<i class="fa-solid fa-pen" style="color:#ccc"></i>':''}</div>`;
     });
 }
+function searchCounterparty() { renderCounterpartyList(); }
 async function saveNewCounterparty() { const n=document.getElementById('newCpName').value; const i=document.getElementById('newCpNationalId').value; const p=document.getElementById('newCpPhone').value; if(n){await dbAddCounterparty({name:n,nationalId:i,phone:p}); renderCounterpartyList(); document.getElementById('addCounterpartyModal').style.display='none'; document.getElementById('newCpName').value='';document.getElementById('newCpNationalId').value='';document.getElementById('newCpPhone').value='';}else alert('نام الزامی'); }
 async function editCp(id,n,p) { const nn=prompt('نام:',n); if(nn){const pp=prompt('شماره:',p); await dbUpdateCounterparty(id,{name:nn,phone:pp}); renderCounterpartyList();} }
 function selectCp(n) { document.getElementById('inputPayTo').value=n; document.getElementById('counterpartyModal').style.display='none'; }
@@ -549,6 +520,8 @@ async function shareCurrentImage() { const b=currentUploadType==='front'?frontIm
 
 // --- Cloud & Scan ---
 async function handleSmartScan(inp) { const f=inp.files[0]; if(!f)return; showLoading("آنالیز..."); const r=new FileReader(); r.onload=async(e)=>{const i=new Image(); i.src=e.target.result; i.onload=async()=>{const c=document.createElement('canvas'); const s=1000/i.width; c.width=1000; c.height=i.height*s; c.getContext('2d').drawImage(i,0,0,c.width,c.height); try{const rs=await fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'scan_check_ocr',image:c.toDataURL('image/jpeg',0.6)})}); const j=await rs.json(); if(j.result==='success'){localStorage.setItem('scannedCheckData',JSON.stringify({sayad:j.data.sayad,date:j.data.date,amount:j.data.amount,image:e.target.result})); window.location.href='add-check.html?mode=scan';}else throw new Error(j.error);}catch(er){alert(er.message);}finally{hideLoading(); inp.value='';}}}; r.readAsDataURL(f); }
+async function backupToGoogle() { exportToExcel(); alert('فایل اکسل دانلود شد. لطفا در گوگل درایو آپلود کنید.'); }
+async function restoreFromGoogle() { alert('سیستم آنلاین است. نیازی به بازیابی نیست.'); }
 
 // --- Report ---
-async function setupReportPage() { let l=await fetchChecks(); const p=l.filter(x=>x.status==='pending'); let s=0; p.forEach(x=>{if(x.type==='pay')s-=parseInt(x.amount);else s+=parseInt(x.amount);}); const c=s<0?'#f44336':s>0?'#4caf50':'#333'; document.getElementById('reportTotalSum').innerHTML=`<span style="color:${c}">${s<0?'-':s>0?'+':''} ${toPersianDigits(Math.abs(s).toLocaleString())}</span> تومان`; const g={}; p.forEach(x=>{const k=toEnglishDigits(x.date).slice(0,7).replace('/','-'); if(!g[k])g[k]=[]; g[k].push(x);}); const ks=Object.keys(g).sort((a,b)=>parseInt(a.replace('-',''))-parseInt(b.replace('-',''))); const sc=document.getElementById('reportScrollContainer'); sc.innerHTML=''; if(ks.length===0){sc.innerHTML='<div style="text-align:center;width:100%">موردی نیست</div>';return;} ks.forEach(k=>{const [y,m]=k.split('-'); const gp=g[k]; let ms=0,mx=0,mn=Infinity; gp.forEach(x=>{const a=parseInt(x.amount); if(x.type==='pay')ms-=a;else ms+=a; if(a>mx)mx=a; if(a<mn)mn=a;}); sc.innerHTML+=`<div class="report-month-card"><div class="rm-header"><span class="rm-title">${getMonthName(m)} ${toPersianDigits(y)}</span><span class="rm-val" style="color:${ms<0?'#f44336':'#4caf50'}">${ms<0?'-':'+'} ${toPersianDigits(Math.abs(ms).toLocaleString())}</span></div><div class="rm-row"><span>تعداد:</span><span class="rm-val">${toPersianDigits(gp.length)}</span></div><div class="rm-row"><span>بیشترین:</span><span class="rm-val">${toPersianDigits(mx.toLocaleString())}</span></div><div class="rm-row"><span>کمترین:</span><span class="rm-val">${toPersianDigits(mn===Infinity?0:mn.toLocaleString())}</span></div></div>`;}); }
+async function setupReportPage() { let l=await fetchChecks(); const p=l.filter(x=>x.status==='pending'); let s=0; p.forEach(x=>{if(x.type==='pay')s-=parseInt(x.amount);else s+=parseInt(x.amount);}); const c=s<0?'#f44336':s>0?'#4caf50':'#333'; document.getElementById('reportTotalSum').innerHTML=`<span style="color:${c}">${s<0?'-':s>0?'+':''} ${toPersianDigits(Math.abs(s).toLocaleString())}</span> ریال`; const g={}; p.forEach(x=>{const k=toEnglishDigits(x.date).slice(0,7).replace('/','-'); if(!g[k])g[k]=[]; g[k].push(x);}); const ks=Object.keys(g).sort((a,b)=>parseInt(a.replace('-',''))-parseInt(b.replace('-',''))); const sc=document.getElementById('reportScrollContainer'); sc.innerHTML=''; if(ks.length===0){sc.innerHTML='<div style="text-align:center;width:100%">موردی نیست</div>';return;} ks.forEach(k=>{const [y,m]=k.split('-'); const gp=g[k]; let ms=0,mx=0,mn=Infinity; gp.forEach(x=>{const a=parseInt(x.amount); if(x.type==='pay')ms-=a;else ms+=a; if(a>mx)mx=a; if(a<mn)mn=a;}); sc.innerHTML+=`<div class="report-month-card"><div class="rm-header"><span class="rm-title">${getMonthName(m)} ${toPersianDigits(y)}</span><span class="rm-val" style="color:${ms<0?'#f44336':'#4caf50'}">${ms<0?'-':'+'} ${toPersianDigits(Math.abs(ms).toLocaleString())}</span></div><div class="rm-row"><span>تعداد:</span><span class="rm-val">${toPersianDigits(gp.length)}</span></div><div class="rm-row"><span>بیشترین:</span><span class="rm-val">${toPersianDigits(mx.toLocaleString())}</span></div><div class="rm-row"><span>کمترین:</span><span class="rm-val">${toPersianDigits(mn===Infinity?0:mn.toLocaleString())}</span></div></div>`;}); }
