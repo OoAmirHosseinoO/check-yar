@@ -110,7 +110,13 @@ async function uploadImageToStorage(base64, folderName) {
 }
 
 async function fetchChecks() {
-    const { data, error } = await sb.from('checks').select('*');
+ 
+    const { data, error } = await sb
+        .from('checks')
+        .select('*')
+        .order('id', { ascending: false }) 
+        .range(0, 9999); 
+
     if (error) { console.error(error); return []; }
     return data;
 }
