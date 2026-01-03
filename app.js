@@ -246,6 +246,9 @@ async function exportToExcel() {
 }
 
 // --- IMPORTANT: Excel Import with Auto-Add Counterparty ---
+// ============================================
+// نسخه نهایی وارد کردن از اکسل (با تشخیص رنگ)
+// ============================================
 async function processExcelFile(inp) { 
     const file = inp.files[0];
     if (!file) return;
@@ -263,22 +266,36 @@ async function processExcelFile(inp) {
             if (jsonData.length === 0) throw new Error("فایل اکسل خالی است");
 
             let checksToAdd = [];
-            let newCounterparties = new Set(); // لیستی برای نام‌های جدید
-
-            // دریافت لیست فعلی طرف حساب‌ها برای مقایسه
+            let newCounterparties = new Set();
             const existingCPs = await fetchCounterparties();
             const existingNames = existingCPs.map(cp => cp.name.trim());
 
+            // مپینگ رنگ‌ها (نام فارسی به کد رنگ برنامه)
+            const colorMap = {
+                'قرمز': '#ff8a80', 'red': '#ff8a80',
+                'نارنجی': '#ffcc80', 'orange': '#ffcc80',
+                'زرد': '#ffff8d', 'yellow': '#ffff8d',
+                'سبز': '#ccff90', 'green': '#ccff90', 'lime': '#ccff90',
+                'آبی': '#80d8ff', 'blue': '#80d8ff',
+                'بنفش': '#ea80fc', 'purple': '#ea80fc'
+            };
+
             for (let row of jsonData) {
                 const keys = Object.keys(row);
+                
+                // تشخیص ستون‌ها
                 const keyAmount = keys.find(k => k.trim().includes('مبلغ') || k.includes('قیمت') || k.toLowerCase().includes('amount') || k.includes('ریال') || k.includes('تومان'));
-                const keyDate = keys.find(k => k.trim().includes('تاریخ') || k.toLowerCase().includes('date') || k.includes('سررسید') || k.includes('زمان'));
+                const keyDate = keys.find(k => k.trim().includes('تاریخ') || k.toLowerCase().includes('date') || k.includes('سررسید'));
                 const keyName = keys.find(k => k.trim().includes('وجه') || k.trim().includes('نام') || k.toLowerCase().includes('name') || k.includes('گیرنده'));
                 const keyType = keys.find(k => k.trim().includes('نوع') || k.toLowerCase().includes('type'));
                 const keyNum = keys.find(k => k.trim().includes('شماره') || k.toLowerCase().includes('no') || k.toLowerCase().includes('num'));
                 const keySayad = keys.find(k => k.trim().includes('صیاد') || k.toLowerCase().includes('sayad'));
                 const keyDesc = keys.find(k => k.trim().includes('توضیح') || k.toLowerCase().includes('desc') || k.includes('بابت'));
+                
+                // --- ستون رنگ (جدید) ---
+                const keyColor = keys.find(k => k.trim().includes('رنگ') || k.toLowerCase().includes('color') || k.includes('تگ'));
 
+                // استخراج مبلغ
                 let rawAmount = keyAmount ? row[keyAmount] : 0;
                 let amount = 0;
                 if(rawAmount) {
@@ -287,6 +304,7 @@ async function processExcelFile(inp) {
                     amount = parseInt(s);
                 }
 
+                // استخراج تاریخ
                 let rawDate = keyDate ? row[keyDate] : '';
                 let dateStr = '';
                 if(rawDate) {
@@ -295,17 +313,29 @@ async function processExcelFile(inp) {
                 }
 
                 if (amount > 0 && dateStr.length >= 6) {
+                    // نوع چک
                     let type = 'pay';
                     if (keyType) {
                         let tVal = row[keyType].toString();
                         if(tVal.includes('دریافت') || tVal.toLowerCase().includes('rec')) type = 'receive';
                     }
 
+                    // طرف حساب
                     const payToName = keyName ? row[keyName].toString().trim() : '';
-
-                    // اگر نام طرف حساب وجود داشت و قبلاً در دیتابیس نبود، به لیست افزودن اضافه کن
                     if (payToName && !existingNames.includes(payToName)) {
                         newCounterparties.add(payToName);
+                    }
+
+                    // --- تشخیص رنگ (جدید) ---
+                    let colorTag = 'none'; // پیش‌فرض
+                    if (keyColor) {
+                        let cVal = row[keyColor].toString().trim().toLowerCase();
+                        // بررسی اینکه آیا نام رنگ است یا کد رنگ
+                        if (colorMap[cVal]) {
+                            colorTag = colorMap[cVal];
+                        } else if (cVal.startsWith('#')) {
+                            colorTag = cVal; // اگر کاربر کد رنگ وارد کرده بود
+                        }
                     }
 
                     checksToAdd.push({
@@ -318,26 +348,28 @@ async function processExcelFile(inp) {
                         sayadNum: keySayad ? toEnglishDigits(row[keySayad].toString().trim()) : '',
                         status: 'pending',
                         bank: 'meli',
-                        colorTag: 'none'
+                        colorTag: colorTag, // <--- رنگ اعمال شد
+                        frontImage: null,
+                        backImage: null
                     });
                 }
             }
 
-            // 1. اول طرف حساب‌های جدید را اضافه کن
+            // 1. افزودن طرف حساب‌های جدید
             if (newCounterparties.size > 0) {
                 const cpArray = Array.from(newCounterparties).map(name => ({ name: name, nationalId: '', phone: '' }));
                 const { error: cpError } = await sb.from('counterparties').insert(cpArray);
                 if (cpError) console.error("CP Import Error", cpError);
             }
 
-            // 2. بعد چک‌ها را اضافه کن
+            // 2. افزودن چک‌ها
             if (checksToAdd.length > 0) {
                 const { error } = await sb.from('checks').insert(checksToAdd);
                 if (error) throw error;
-                alert(`${checksToAdd.length} فقره چک و طرف حساب‌های جدید وارد شدند.`);
+                alert(`${checksToAdd.length} فقره چک با موفقیت وارد شد.`);
                 location.reload();
             } else {
-                alert("هیچ چک معتبری یافت نشد. ستون مبلغ و تاریخ الزامی است.");
+                alert("هیچ چک معتبری یافت نشد. (ستون‌های الزامی: مبلغ، تاریخ)");
             }
 
         } catch (err) {
