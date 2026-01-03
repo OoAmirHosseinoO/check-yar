@@ -2,25 +2,26 @@
 <html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>لیست چک ها</title>
-<!-- تنظیمات PWA و آیفون -->
+    
+    <!-- تنظیمات PWA (اضافه شد) -->
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="یادآور چک">
-    <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="theme-color" content="#00bcd4">
+    <link rel="apple-touch-icon" href="icon-192.png">
 
-    <!-- ثبت سرویس ورکر -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(() => console.log('Service Worker Registered'));
-        }
-    </script>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/iranianbanklogos@1.0.0/dist/ibl.min.css">
+
+    <!-- ثبت سرویس ورکر (اضافه شد) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(console.error);
+        }
+    </script>
 </head>
 <body>
     <header class="app-header">
@@ -58,7 +59,7 @@
         <div class="filter-modal-content">
             <div style="padding:15px;background:#f9f9f9;display:flex;justify-content:space-between"><b>فیلتر پیشرفته</b><span style="color:red;cursor:pointer" onclick="location.reload()">لغو</span></div>
             <div class="filter-section"><span class="filter-title">نوع چک</span><div style="display:flex;gap:20px"><label><input type="checkbox" id="chkPay" checked> پرداختی</label><label><input type="checkbox" id="chkRec" checked> دریافتی</label></div></div>
-            <div class="filter-section"><span class="filter-title">مبلغ</span><div class="range-inputs"><input id="filterMinAmount" placeholder="از"><input id="filterMaxAmount" placeholder="تا"></div></div>
+            <div class="filter-section"><span class="filter-title">مبلغ (ریال)</span><div class="range-inputs"><input id="filterMinAmount" placeholder="از"><input id="filterMaxAmount" placeholder="تا"></div></div>
             <div class="filter-section"><span class="filter-title">سررسید</span><div class="range-inputs"><input id="filterStartDueDate" class="date-input-trigger" readonly placeholder="از" onclick="openCustomCalendar(this.id)"><input id="filterEndDueDate" class="date-input-trigger" readonly placeholder="تا" onclick="openCustomCalendar(this.id)"></div></div>
             <div class="filter-section"><span class="filter-title">بانک</span><input id="filterBankDisplay" class="clean-input" readonly placeholder="انتخاب کنید" onclick="openBankModal()"><input type="hidden" id="filterBankValue"></div>
             <div class="filter-section"><span class="filter-title">طرف حساب</span><input id="filterPayTo" class="clean-input" style="width:100%;border:1px solid #ddd;padding:5px"></div>
@@ -88,10 +89,18 @@
 
     <div id="customCalendarModal" class="modal-overlay modal-center" style="z-index:6000"><div class="modal-content modal-content-center custom-calendar-box"><div class="picker-display-header"><div id="pickerSelectedDayName">...</div><div id="pickerSelectedFullDate">...</div></div><div style="padding:10px;display:flex;justify-content:space-between"><span onclick="calPrev()">&lt;</span><span id="calendarTitle" onclick="calSwitchView()">...</span><span onclick="calNext()">&gt;</span></div><div style="padding:10px;height:250px"><div id="calViewDays"><div class="calendar-days" id="calendarDaysGrid"></div></div><div id="calViewMonths" style="display:none"><div class="calendar-months-grid" id="calendarMonthsGrid"></div></div><div id="calViewYears" style="display:none"><div class="calendar-years-grid" id="calendarYearsGrid"></div></div></div><div class="calendar-btn-row"><button class="cal-btn btn-cancel" onclick="closeCalendarModal()">انصراف</button><button class="cal-btn btn-today" onclick="goToToday()">امروز</button><button class="cal-btn btn-confirm" onclick="confirmDateSelection()">تایید</button></div></div></div>
     
-    <div id="counterpartyModal" class="modal-overlay" style="align-items:flex-end;"><div class="modal-content modal-full-screen" style="height:100vh; border-radius:0;"><div class="modal-header"><span>طرف حساب</span><i class="fa-solid fa-plus" style="float:left;cursor:pointer" onclick="document.getElementById('addCounterpartyModal').style.display='flex'"></i><i class="fa-solid fa-arrow-down" style="float:right;cursor:pointer" onclick="document.getElementById('counterpartyModal').style.display='none'"></i></div><div class="cp-search-box"><input type="text" id="cpSearchInput" class="search-input" placeholder="جستجو..." onkeyup="searchCounterparty()"></div><div id="counterpartyList" class="modal-body" style="height:calc(100vh - 120px);overflow:auto"></div></div></div>
+    <div id="bankModal" class="modal-overlay"><div class="modal-content"><div class="modal-header">انتخاب بانک</div><div id="bankListContainer" class="modal-body" style="max-height:60vh;overflow:auto"></div><div class="modal-footer"><button class="close-modal-btn" onclick="document.getElementById('bankModal').style.display='none'">بستن</button></div></div></div>
+
+    <div id="counterpartyModal" class="modal-overlay" style="align-items:flex-end;">
+        <div class="modal-content modal-full-screen" style="height:100vh; border-radius:0;">
+            <div class="modal-header"><span>طرف حساب</span><i class="fa-solid fa-plus" style="float:left;cursor:pointer" onclick="document.getElementById('addCounterpartyModal').style.display='flex'"></i><i class="fa-solid fa-arrow-down" style="float:right;cursor:pointer" onclick="document.getElementById('counterpartyModal').style.display='none'"></i></div>
+            <div class="cp-search-box"><input type="text" id="cpSearchInput" class="search-input" placeholder="جستجو..." onkeyup="searchCounterparty()"></div>
+            <div id="counterpartyList" class="modal-body" style="height:calc(100vh - 120px);overflow:auto"></div>
+        </div>
+    </div>
+    
     <div id="addCounterpartyModal" class="modal-overlay" style="z-index:5500"><div class="modal-content"><div class="modal-header">طرف حساب جدید</div><div class="modal-body cp-add-form"><input id="newCpName" class="cp-input" placeholder="نام و نام خانوادگی"><input id="newCpNationalId" class="cp-input" placeholder="کد / شناسه ملی" inputmode="numeric"><input id="newCpPhone" class="cp-input" placeholder="شماره تماس" inputmode="numeric"></div><div class="modal-footer" style="display:flex;gap:10px"><button class="close-modal-btn" style="flex:1" onclick="document.getElementById('addCounterpartyModal').style.display='none'">انصراف</button><button class="action-btn-full" style="flex:1" onclick="saveNewCounterparty()">ذخیره</button></div></div></div>
     
-    <div id="bankModal" class="modal-overlay"><div class="modal-content"><div class="modal-header">انتخاب بانک</div><div id="bankListContainer" class="modal-body" style="max-height:60vh;overflow:auto"></div><div class="modal-footer"><button class="close-modal-btn" onclick="document.getElementById('bankModal').style.display='none'">بستن</button></div></div></div>
     <div id="backupListModal" class="modal-overlay"><div class="modal-content"><div class="modal-header">انتخاب بکاپ</div><div id="backupListContainer" class="modal-body" style="max-height:60vh;overflow:auto;padding:10px"></div><div class="modal-footer"><button class="action-btn-full" onclick="document.getElementById('backupListModal').style.display='none'">بستن</button></div></div></div>
 
     <nav class="bottom-navigation">
