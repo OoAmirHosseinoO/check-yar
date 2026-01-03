@@ -1,13 +1,10 @@
 // ============================================================
-// app.js - FINAL FIXED (Weekly Logic + Filters)
+// app.js - FINAL FIXED VERSION (Filters & Weeks)
 // ============================================================
 
 // >>> 1. تنظیمات SUPABASE <<<
 const SUPABASE_URL = 'https://ytledwlmnkxswaekavmr.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0bGVkd2xtbmt4c3dhZWthdm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyODY0MzQsImV4cCI6MjA4Mjg2MjQzNH0.aIrcPpb1EmRIcitLcsFYajM4yTOhnOU_RLEa33TIcOk';
-
-// >>> 2. لینک گوگل اسکریپت <<<
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxt8Yq0cCeyze6Ow0TT6vSk714Af5o_-h_QjMunDtMkbDUZf1F6oNIF-J89R_caYpbS/exec';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -25,7 +22,7 @@ let calViewMode = 'days', calSelectedYear, calSelectedMonth, calSelectedDay, cal
 let isCpEditMode = false;
 let sortDescending = false;
 
-// وضعیت فیلتر پیشرفته
+// آبجکت وضعیت فیلتر (تمیز شده)
 let filterState = { 
     minAmount: null, maxAmount: null, 
     startDueDate: null, endDueDate: null, 
@@ -87,7 +84,7 @@ function addLogoutButton() {
 }
 
 // ============================================================
-// [SECTION 1] DATABASE & STORAGE
+// [SECTION 1] DATABASE
 // ============================================================
 
 function base64ToBlob(base64) {
@@ -165,12 +162,12 @@ function getDateScore(s) { if(!s)return 9e7; const p=toEnglishDigits(s).split('/
 
 function getStatusInfo(s) {
     switch(s) {
-        case 'pending': return { text: 'در انتظار', color: '#ffa000' };
-        case 'passed': return { text: 'پاس شده', color: '#4caf50' };
-        case 'bounced': return { text: 'برگشتی', color: '#f44336' };
-        case 'spent': return { text: 'خرج شده', color: '#2196f3' };
-        case 'canceled': return { text: 'ابطال شده', color: '#9e9e9e' };
-        default: return { text: 'نامشخص', color: '#333' };
+        case 'pending': return { text: 'در انتظار', color: '#ffa000', bg: '#fff8e1' };
+        case 'passed': return { text: 'پاس شده', color: '#4caf50', bg: '#e8f5e9' };
+        case 'bounced': return { text: 'برگشتی', color: '#f44336', bg: '#ffebee' };
+        case 'spent': return { text: 'خرج شده', color: '#2196f3', bg: '#e3f2fd' };
+        case 'canceled': return { text: 'ابطال شده', color: '#9e9e9e', bg: '#f5f5f5' };
+        default: return { text: 'نامشخص', color: '#333', bg: '#eee' };
     }
 }
 
@@ -200,15 +197,13 @@ function hideLoading() { const l=document.getElementById('loadingModal'); if(l)l
 function gregorianToJalaali(gy,gm,gd){var g_d_m=[0,31,59,90,120,151,181,212,243,273,304,334];var gy2=(gm>2)?(gy+1):gy;var days=355666+(365*gy)+parseInt((gy2+3)/4)-parseInt((gy2+99)/100)+parseInt((gy2+399)/400)+gd+g_d_m[gm-1];var jy=-1595+(33*parseInt(days/12053));days%=12053;jy+=4*parseInt(days/1461);days%=1461;if(days>365){jy+=parseInt((days-1)/365);days=(days-1)%365;}var jm,jd;if(days<186){jm=1+parseInt(days/31);jd=1+(days%31);}else{jm=7+parseInt((days-186)/30);jd=1+((days-186)%30);}return[jy,jm,jd];}
 function jalaaliToGregorian(jy,jm,jd){jy+=1595;var days=-355668+(365*jy)+(parseInt(jy/33)*8)+parseInt(((jy%33)+3)/4)+jd+((jm<7)?(jm-1)*31:((jm-7)*30)+186);var gy=400*parseInt(days/146097);days%=146097;if(days>36524){gy+=100*parseInt(--days/36524);days%=36524;if(days>=365)days++;}gy+=4*parseInt(days/1461);days%=1461;if(days>365){gy+=parseInt((days-1)/365);days=(days-1)%365;}var gd=days+1;var sal_a=[0,31,((gy%4==0&&gy%100!=0)||(gy%400==0))?29:28,31,30,31,30,31,31,30,31,30,31];var gm;for(gm=0;gm<13;gm++){var v=sal_a[gm];if(gd<=v)break;gd-=v;}return[gy,gm,gd];}
 function getTodayJalaali(){const n=new Date();return gregorianToJalaali(n.getFullYear(),n.getMonth()+1,n.getDate());}
-
-// *** تابع جدید برای محاسبه روز اول هفته (شنبه=0 ... جمعه=6) ***
 function getJalaaliFirstWeekDay(jy, jm) {
     const [gy, gm, gd] = jalaaliToGregorian(jy, jm, 1);
-    const dayOfWeek = new Date(gy, gm - 1, gd).getDay(); // 0=Sun, 1=Mon...
-    // تبدیل به شنبه=0
+    const dayOfWeek = new Date(gy, gm - 1, gd).getDay();
     return (dayOfWeek + 1) % 7;
 }
 
+// --- Calendar UI ---
 function openCustomCalendar(id) { activeDateInputId=id; document.getElementById('customCalendarModal').style.display='flex'; const [y,m,d]=getTodayJalaali(); const v=document.getElementById(id).value; if(v&&v.split('/').length===3){const p=toEnglishDigits(v).split('/');calSelectedYear=parseInt(p[0]);calSelectedMonth=parseInt(p[1]);calSelectedDay=parseInt(p[2]);calViewingYear=calSelectedYear;calViewingMonth=calSelectedMonth;}else{calViewingYear=y;calViewingMonth=m;calSelectedYear=y;calSelectedMonth=m;calSelectedDay=d;} calViewMode='days'; updateCalendarView(); updatePickerDisplay(); }
 function closeCalendarModal() { document.getElementById('customCalendarModal').style.display='none'; }
 function confirmDateSelection() { if(calSelectedYear){const m=calSelectedMonth<10?'0'+calSelectedMonth:calSelectedMonth; const d=calSelectedDay<10?'0'+calSelectedDay:calSelectedDay; document.getElementById(activeDateInputId).value=toPersianDigits(`${calSelectedYear}/${m}/${d}`); closeCalendarModal();} }
@@ -230,16 +225,24 @@ function openCounterpartyListMode() { closeSideMenu(); openCounterpartyModal(tru
 async function exportToExcel() {
     closeSideMenu(); showLoading("ایجاد فایل اکسل...");
     try {
-        const allChecks = await fetchChecks();
-        if (allChecks.length === 0) { alert("داده‌ای نیست"); hideLoading(); return; }
-        const excelRows = allChecks.map(check => ({
+        const allChecksList = await fetchChecks();
+        if (allChecksList.length === 0) { alert("داده‌ای نیست"); hideLoading(); return; }
+        
+        const excelRows = allChecksList.map(check => ({
             "مبلغ (ریال)": check.amount, "تاریخ سررسید": check.date, "نوع چک": check.type === 'pay' ? 'پرداختی' : 'دریافتی',
             "طرف حساب": check.payTo, "بانک": getBankNameFA(check.bank), "وضعیت": getStatusInfo(check.status).text,
             "شماره چک": check.checkNum, "شناسه صیاد": check.sayadNum, "توضیحات": check.desc
         }));
-        const ws=XLSX.utils.json_to_sheet(excelRows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Checks"); const [currY,currM,currD]=getTodayJalaali(); XLSX.writeFile(wb,`CheckList_${currY}-${currM}-${currD}.xlsx`);
-    } catch(e) { alert(e.message); } finally { hideLoading(); }
+
+        const ws = XLSX.utils.json_to_sheet(excelRows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Checks");
+        const [currY, currM, currD] = getTodayJalaali();
+        XLSX.writeFile(wb, `CheckList_${currY}-${currM}-${currD}.xlsx`);
+        
+    } catch (e) { alert(e.message); } finally { hideLoading(); }
 }
+
 async function processExcelFile(inp) { alert('در نسخه آنلاین، فعلاً ثبت دستی پیشنهاد می‌شود.'); inp.value = ''; }
 
 // --- Dashboard ---
@@ -273,24 +276,18 @@ async function renderDashboardCalendar() {
     }
     container.innerHTML = html;
 }
-
-// *** تابع اصلاح شده جزئیات ماه (هفته‌های تقویمی) ***
 async function openMonthDetails(year, month) {
     let list = await fetchChecks();
     const monthChecks = list.filter(c => { const p = toEnglishDigits(c.date).split('/'); return parseInt(p[0]) === year && parseInt(p[1]) === month; });
     let count = monthChecks.length; let sumPay = 0; let sumRec = 0;
-    
-    // آرایه ۶ هفته‌ای برای اطمینان
-    let weeks = [0, 0, 0, 0, 0, 0]; 
+    // منطق جدید هفته
+    let weeks = [0, 0, 0, 0, 0, 0];
     const firstDayOfWeek = getJalaaliFirstWeekDay(year, month);
 
     monthChecks.forEach(c => {
         const amt = parseInt(c.amount);
         const day = parseInt(toEnglishDigits(c.date).split('/')[2]);
-        
-        // محاسبه شماره هفته تقویمی
-        const weekIdx = Math.floor((day + firstDayOfWeek - 1) / 7);
-        
+        const weekIdx = Math.floor((day + firstDayOfWeek - 1) / 7); // محاسبه دقیق هفته
         if (c.type === 'pay') { sumPay += amt; weeks[weekIdx] -= amt; } 
         else { sumRec += amt; weeks[weekIdx] += amt; }
     });
@@ -325,12 +322,10 @@ function setupFilterTabs() { document.querySelectorAll('.filter-tab').forEach(t=
 function openFilterModal(){document.getElementById('filterModal').style.display='flex';} 
 function closeFilterModal(){document.getElementById('filterModal').style.display='none';}
 
-// *** تابع اصلاح شده اعمال فیلتر ***
+// *** تابع اصلاح‌شده اعمال فیلتر و بستن پاپ‌آپ ***
 function applyAdvancedFilter(){ 
     const min=document.getElementById('filterMinAmount').value.replace(/,/g,''); 
     const max=document.getElementById('filterMaxAmount').value.replace(/,/g,''); 
-    
-    // 1. ذخیره در آبجکت وضعیت
     filterState.minAmount=min?parseInt(toEnglishDigits(min)):null; 
     filterState.maxAmount=max?parseInt(toEnglishDigits(max)):null; 
     filterState.startDueDate=document.getElementById('filterStartDueDate').value; 
@@ -339,32 +334,30 @@ function applyAdvancedFilter(){
     filterState.endIssueDate=document.getElementById('filterEndIssueDate').value; 
     filterState.payTo=document.getElementById('filterPayTo').value;
     filterState.bank=document.getElementById('filterBankValue').value;
-
-    filterState.type=[]; 
-    if(document.getElementById('chkPay').checked) filterState.type.push('pay'); 
-    if(document.getElementById('chkRec').checked) filterState.type.push('receive');
-
-    filterState.status=[]; 
-    document.querySelectorAll('.status-filter-check:checked').forEach(c=>filterState.status.push(c.value));
+    filterState.type=[]; if(document.getElementById('chkPay').checked)filterState.type.push('pay'); if(document.getElementById('chkRec').checked)filterState.type.push('receive');
+    filterState.status=[]; document.querySelectorAll('.status-filter-check:checked').forEach(c=>filterState.status.push(c.value));
     
-    // 2. بستن مودال و رندر مجدد
-    closeFilterModal(); 
-    renderCheckList(); 
+    closeFilterModal(); // بستن پاپ آپ
+    renderCheckList(); // اعمال فیلتر
 }
 
-// دکمه لغو فیلتر (پاکسازی و ریلود)
+// تابع جدید لغو فیلتر (اضافه شد)
 function resetAdvancedFilter() {
     filterState = { minAmount: null, maxAmount: null, startDueDate: null, endDueDate: null, startIssueDate: null, endIssueDate: null, excludedColors: [], payTo: '', bank: '', type: [], status: [] };
-    // پاکسازی اینپوت‌ها
-    document.getElementById('filterMinAmount').value = '';
-    document.getElementById('filterMaxAmount').value = '';
-    document.getElementById('filterStartDueDate').value = '';
-    document.getElementById('filterEndDueDate').value = '';
-    document.getElementById('filterPayTo').value = '';
-    // ریست چک‌باکس‌ها
+    // پاکسازی فرم
+    document.getElementById('filterMinAmount').value='';
+    document.getElementById('filterMaxAmount').value='';
+    document.getElementById('filterStartDueDate').value='';
+    document.getElementById('filterEndDueDate').value='';
+    document.getElementById('filterStartIssueDate').value='';
+    document.getElementById('filterEndIssueDate').value='';
+    document.getElementById('filterPayTo').value='';
+    document.getElementById('filterBankValue').value='';
+    document.getElementById('filterBankDisplay').value='';
+    // ریست چک باکس
+    document.getElementById('chkPay').checked=true;
+    document.getElementById('chkRec').checked=true;
     document.querySelectorAll('.status-filter-check').forEach(c=>c.checked=true);
-    document.getElementById('chkPay').checked = true;
-    document.getElementById('chkRec').checked = true;
     
     closeFilterModal();
     renderCheckList();
@@ -376,19 +369,18 @@ function toggleFilterColor(c,e){if(filterState.excludedColors.includes(c)){filte
 async function renderCheckList() {
     let l = await fetchChecks();
     const u=new URLSearchParams(window.location.search); const yf=u.get('year'), mf=u.get('month'), tf=u.get('filter');
-    
     if(tf==='pay') l=l.filter(x=>x.type==='pay'); else if(tf==='receive') l=l.filter(x=>x.type==='receive');
     if(yf&&mf) { l=l.filter(x=>{const p=toEnglishDigits(x.date).split('/'); return parseInt(p[0])==yf && parseInt(p[1])==mf;}); document.querySelector('.filter-tabs-container').style.display='none'; document.querySelector('.header-center h1').innerText=`${getMonthName(mf)} ${toPersianDigits(yf)}`; }
     else if(filterState.status.length>0) l=l.filter(x=>filterState.status.includes(x.status)); 
     else l=l.filter(x=>activeStatusFilters.includes(x.status));
     
-    // اعمال فیلترهای پیشرفته
     if(filterState.minAmount) l=l.filter(x=>x.amount>=filterState.minAmount); if(filterState.maxAmount) l=l.filter(x=>x.amount<=filterState.maxAmount);
     if(filterState.startDueDate) l=l.filter(x=>getDateScore(x.date)>=getDateScore(filterState.startDueDate)); if(filterState.endDueDate) l=l.filter(x=>getDateScore(x.date)<=getDateScore(filterState.endDueDate));
     if(filterState.startIssueDate) l=l.filter(x=>getDateScore(x.issueDate)>=getDateScore(filterState.startIssueDate)); if(filterState.endIssueDate) l=l.filter(x=>getDateScore(x.issueDate)<=getDateScore(filterState.endIssueDate));
     if(filterState.payTo) l=l.filter(x=>x.payTo.includes(filterState.payTo));
     if(filterState.bank) l=l.filter(x=>x.bank===filterState.bank);
     if(filterState.type.length>0) l=l.filter(x=>filterState.type.includes(x.type));
+    
     l=l.filter(x=>!filterState.excludedColors.includes(x.colorTag||'none'));
     
     const con=document.getElementById('checkListContainer'); con.innerHTML='';
@@ -422,12 +414,7 @@ function setupAddCheckPage() {
     if(p.get('id')){
         editingCheckId=p.get('id'); document.getElementById('pageTitle').innerText="ویرایش چک"; document.getElementById('deleteCheckBtn').style.display='flex'; loadCheckDataForEdit(editingCheckId);
     } else {
-        const statusDisp = document.getElementById('inputStatusDisplay');
-        statusDisp.value='در انتظار';
-        statusDisp.style.color='#ffa000'; 
-        statusDisp.style.fontWeight='bold';
-        document.getElementById('inputStatusValue').value='pending';
-        
+        const d=document.getElementById('inputStatusDisplay'); d.value='در انتظار'; d.style.color='#ffa000'; d.style.fontWeight='bold'; document.getElementById('inputStatusValue').value='pending';
         if(document.getElementById('inputIssueDate')) document.getElementById('inputIssueDate').value=toPersianDigits(`${ty}/${tm<10?'0'+tm:tm}/${td<10?'0'+td:td}`); selectedColor='none';
         if(p.get('mode')==='scan'){
             const s=JSON.parse(localStorage.getItem('scannedCheckData')||'{}'); if(s.sayad)document.getElementById('sayadNum').value=toPersianDigits(s.sayad); if(s.date)document.getElementById('inputDate').value=toPersianDigits(s.date); if(s.amount)document.getElementById('inputAmount').value=toPersianDigits(parseInt(s.amount).toLocaleString()); if(s.image){frontImageBase64=s.image; updateImageBox('areaFront',s.image);} localStorage.removeItem('scannedCheckData'); document.getElementById('pageTitle').innerText="چک اسکن شده";
