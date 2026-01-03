@@ -249,11 +249,14 @@ async function exportToExcel() {
 // ============================================
 // نسخه نهایی وارد کردن از اکسل (با تشخیص رنگ)
 // ============================================
+// ============================================
+// نسخه نهایی وارد کردن اکسل (با رنگ و وضعیت)
+// ============================================
 async function processExcelFile(inp) { 
     const file = inp.files[0];
     if (!file) return;
 
-    showLoading("در حال آنالیز هوشمند فایل...");
+    showLoading("در حال پردازش هوشمند...");
     
     const reader = new FileReader();
     reader.onload = async function(e) {
@@ -270,30 +273,41 @@ async function processExcelFile(inp) {
             const existingCPs = await fetchCounterparties();
             const existingNames = existingCPs.map(cp => cp.name.trim());
 
-            // مپینگ رنگ‌ها (نام فارسی به کد رنگ برنامه)
+            // 1. دیکشنری رنگ‌ها (نام فارسی در اکسل -> کد رنگ)
             const colorMap = {
                 'قرمز': '#ff8a80', 'red': '#ff8a80',
                 'نارنجی': '#ffcc80', 'orange': '#ffcc80',
                 'زرد': '#ffff8d', 'yellow': '#ffff8d',
                 'سبز': '#ccff90', 'green': '#ccff90', 'lime': '#ccff90',
                 'آبی': '#80d8ff', 'blue': '#80d8ff',
-                'بنفش': '#ea80fc', 'purple': '#ea80fc'
+                'بنفش': '#ea80fc', 'purple': '#ea80fc',
+                'صورتی': '#ea80fc'
+            };
+
+            // 2. دیکشنری وضعیت‌ها (نام فارسی در اکسل -> کد وضعیت)
+            const statusMap = {
+                'پاس': 'passed', 'پاس شده': 'passed', 'وصول': 'passed', 'تایید': 'passed',
+                'برگشت': 'bounced', 'برگشتی': 'bounced', 'عدم موجودی': 'bounced',
+                'خرج': 'spent', 'خرج شده': 'spent', 'واگذار': 'spent',
+                'باطل': 'canceled', 'ابطال': 'canceled', 'لغو': 'canceled',
+                'انتظار': 'pending', 'در انتظار': 'pending'
             };
 
             for (let row of jsonData) {
                 const keys = Object.keys(row);
                 
                 // تشخیص ستون‌ها
-                const keyAmount = keys.find(k => k.trim().includes('مبلغ') || k.includes('قیمت') || k.toLowerCase().includes('amount') || k.includes('ریال') || k.includes('تومان'));
-                const keyDate = keys.find(k => k.trim().includes('تاریخ') || k.toLowerCase().includes('date') || k.includes('سررسید'));
-                const keyName = keys.find(k => k.trim().includes('وجه') || k.trim().includes('نام') || k.toLowerCase().includes('name') || k.includes('گیرنده'));
-                const keyType = keys.find(k => k.trim().includes('نوع') || k.toLowerCase().includes('type'));
-                const keyNum = keys.find(k => k.trim().includes('شماره') || k.toLowerCase().includes('no') || k.toLowerCase().includes('num'));
-                const keySayad = keys.find(k => k.trim().includes('صیاد') || k.toLowerCase().includes('sayad'));
-                const keyDesc = keys.find(k => k.trim().includes('توضیح') || k.toLowerCase().includes('desc') || k.includes('بابت'));
+                const keyAmount = keys.find(k => k.includes('مبلغ') || k.includes('قیمت') || k.toLowerCase().includes('amount') || k.includes('ریال'));
+                const keyDate = keys.find(k => k.includes('تاریخ') || k.toLowerCase().includes('date') || k.includes('سررسید'));
+                const keyName = keys.find(k => k.includes('وجه') || k.includes('نام') || k.includes('گیرنده'));
+                const keyType = keys.find(k => k.includes('نوع') || k.toLowerCase().includes('type'));
+                const keyNum = keys.find(k => k.includes('شماره') || k.toLowerCase().includes('no'));
+                const keySayad = keys.find(k => k.includes('صیاد') || k.toLowerCase().includes('sayad'));
+                const keyDesc = keys.find(k => k.includes('توضیح') || k.includes('بابت'));
                 
-                // --- ستون رنگ (جدید) ---
-                const keyColor = keys.find(k => k.trim().includes('رنگ') || k.toLowerCase().includes('color') || k.includes('تگ'));
+                // ستون‌های جدید
+                const keyColor = keys.find(k => k.includes('رنگ') || k.includes('تگ') || k.toLowerCase().includes('color'));
+                const keyStatus = keys.find(k => k.includes('وضعیت') || k.includes('حالت') || k.toLowerCase().includes('status'));
 
                 // استخراج مبلغ
                 let rawAmount = keyAmount ? row[keyAmount] : 0;
@@ -313,7 +327,7 @@ async function processExcelFile(inp) {
                 }
 
                 if (amount > 0 && dateStr.length >= 6) {
-                    // نوع چک
+                    // نوع
                     let type = 'pay';
                     if (keyType) {
                         let tVal = row[keyType].toString();
@@ -326,15 +340,28 @@ async function processExcelFile(inp) {
                         newCounterparties.add(payToName);
                     }
 
-                    // --- تشخیص رنگ (جدید) ---
-                    let colorTag = 'none'; // پیش‌فرض
+                    // --- پردازش رنگ ---
+                    let finalColor = 'none';
                     if (keyColor) {
-                        let cVal = row[keyColor].toString().trim().toLowerCase();
-                        // بررسی اینکه آیا نام رنگ است یا کد رنگ
-                        if (colorMap[cVal]) {
-                            colorTag = colorMap[cVal];
-                        } else if (cVal.startsWith('#')) {
-                            colorTag = cVal; // اگر کاربر کد رنگ وارد کرده بود
+                        let cVal = row[keyColor].toString().trim().toLowerCase(); // مثلا "قرمز"
+                        // چک میکنیم ایا در لیست ما هست؟
+                        for (const [key, value] of Object.entries(colorMap)) {
+                            if (cVal.includes(key)) {
+                                finalColor = value;
+                                break;
+                            }
+                        }
+                    }
+
+                    // --- پردازش وضعیت ---
+                    let finalStatus = 'pending'; // پیش‌فرض
+                    if (keyStatus) {
+                        let sVal = row[keyStatus].toString().trim().toLowerCase(); // مثلا "پاس شده"
+                        for (const [key, value] of Object.entries(statusMap)) {
+                            if (sVal.includes(key)) {
+                                finalStatus = value;
+                                break;
+                            }
                         }
                     }
 
@@ -346,30 +373,29 @@ async function processExcelFile(inp) {
                         desc: keyDesc ? row[keyDesc].toString().trim() : '',
                         checkNum: keyNum ? toEnglishDigits(row[keyNum].toString().trim()) : '',
                         sayadNum: keySayad ? toEnglishDigits(row[keySayad].toString().trim()) : '',
-                        status: 'pending',
+                        status: finalStatus,    // وضعیت اعمال شد
+                        colorTag: finalColor,   // رنگ اعمال شد
                         bank: 'meli',
-                        colorTag: colorTag, // <--- رنگ اعمال شد
                         frontImage: null,
                         backImage: null
                     });
                 }
             }
 
-            // 1. افزودن طرف حساب‌های جدید
+            // 1. ثبت طرف حساب‌های جدید
             if (newCounterparties.size > 0) {
                 const cpArray = Array.from(newCounterparties).map(name => ({ name: name, nationalId: '', phone: '' }));
-                const { error: cpError } = await sb.from('counterparties').insert(cpArray);
-                if (cpError) console.error("CP Import Error", cpError);
+                await sb.from('counterparties').insert(cpArray);
             }
 
-            // 2. افزودن چک‌ها
+            // 2. ثبت چک‌ها
             if (checksToAdd.length > 0) {
                 const { error } = await sb.from('checks').insert(checksToAdd);
                 if (error) throw error;
                 alert(`${checksToAdd.length} فقره چک با موفقیت وارد شد.`);
                 location.reload();
             } else {
-                alert("هیچ چک معتبری یافت نشد. (ستون‌های الزامی: مبلغ، تاریخ)");
+                alert("هیچ چک معتبری یافت نشد. (مبلغ و تاریخ الزامی است)");
             }
 
         } catch (err) {
