@@ -1,10 +1,13 @@
 // ============================================================
-// app.js - FINAL FIXED VERSION (Filters & Weeks)
+// app.js - FINAL FIXED (Filter Buttons Fixed)
 // ============================================================
 
 // >>> 1. تنظیمات SUPABASE <<<
 const SUPABASE_URL = 'https://ytledwlmnkxswaekavmr.supabase.co'; 
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0bGVkd2xtbmt4c3dhZWthdm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyODY0MzQsImV4cCI6MjA4Mjg2MjQzNH0.aIrcPpb1EmRIcitLcsFYajM4yTOhnOU_RLEa33TIcOk';
+
+// >>> 2. لینک گوگل اسکریپت <<<
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxt8Yq0cCeyze6Ow0TT6vSk714Af5o_-h_QjMunDtMkbDUZf1F6oNIF-J89R_caYpbS/exec';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -22,7 +25,7 @@ let calViewMode = 'days', calSelectedYear, calSelectedMonth, calSelectedDay, cal
 let isCpEditMode = false;
 let sortDescending = false;
 
-// آبجکت وضعیت فیلتر (تمیز شده)
+// وضعیت فیلتر پیشرفته
 let filterState = { 
     minAmount: null, maxAmount: null, 
     startDueDate: null, endDueDate: null, 
@@ -84,7 +87,7 @@ function addLogoutButton() {
 }
 
 // ============================================================
-// [SECTION 1] DATABASE
+// [SECTION 1] DATABASE & STORAGE
 // ============================================================
 
 function base64ToBlob(base64) {
@@ -242,8 +245,9 @@ async function exportToExcel() {
         
     } catch (e) { alert(e.message); } finally { hideLoading(); }
 }
-
-async function processExcelFile(inp) { alert('در نسخه آنلاین، فعلاً ثبت دستی پیشنهاد می‌شود.'); inp.value = ''; }
+async function processExcelFile(inp) { 
+    alert('در نسخه آنلاین، فعلاً ثبت دستی پیشنهاد می‌شود.'); inp.value = ''; 
+}
 
 // --- Dashboard ---
 async function loadDashboardData() {
@@ -279,19 +283,8 @@ async function renderDashboardCalendar() {
 async function openMonthDetails(year, month) {
     let list = await fetchChecks();
     const monthChecks = list.filter(c => { const p = toEnglishDigits(c.date).split('/'); return parseInt(p[0]) === year && parseInt(p[1]) === month; });
-    let count = monthChecks.length; let sumPay = 0; let sumRec = 0;
-    // منطق جدید هفته
-    let weeks = [0, 0, 0, 0, 0, 0];
-    const firstDayOfWeek = getJalaaliFirstWeekDay(year, month);
-
-    monthChecks.forEach(c => {
-        const amt = parseInt(c.amount);
-        const day = parseInt(toEnglishDigits(c.date).split('/')[2]);
-        const weekIdx = Math.floor((day + firstDayOfWeek - 1) / 7); // محاسبه دقیق هفته
-        if (c.type === 'pay') { sumPay += amt; weeks[weekIdx] -= amt; } 
-        else { sumRec += amt; weeks[weekIdx] += amt; }
-    });
-
+    let count = monthChecks.length; let sumPay = 0; let sumRec = 0; let weeks = [0, 0, 0, 0, 0];
+    monthChecks.forEach(c => { const amt = parseInt(c.amount); const day = parseInt(toEnglishDigits(c.date).split('/')[2]); const weekIdx = Math.min(Math.floor((day - 1) / 7), 4); if (c.type === 'pay') { sumPay += amt; weeks[weekIdx] -= amt; } else { sumRec += amt; weeks[weekIdx] += amt; } });
     const balance = sumRec - sumPay;
     document.getElementById('mdMonthName').innerText = getMonthName(month);
     document.getElementById('mdYear').innerText = toPersianDigits(year);
@@ -301,17 +294,10 @@ async function openMonthDetails(year, month) {
     const balEl = document.getElementById('mdBalance');
     balEl.innerText = `${toPersianDigits(Math.abs(balance).toLocaleString())} ریال ${balance<0?'(بدهکار)':'(تراز)'}`;
     balEl.className = balance < 0 ? 'dc-val text-danger' : 'dc-val';
-
     const wContainer = document.getElementById('mdWeeksContainer'); wContainer.innerHTML = '';
-    const wNames = ['اول', 'دوم', 'سوم', 'چهارم', 'پنجم', 'ششم'];
-    weeks.forEach((wBal, i) => { 
-        if (wBal !== 0) { 
-            const wSign = wBal < 0 ? '-' : '+'; const wColor = wBal < 0 ? '#d32f2f' : '#388e3c'; 
-            wContainer.innerHTML += `<div class="wk-row"><span>هفته ${wNames[i]}</span><span style="color:${wColor}; direction:ltr;">${wSign} ${toPersianDigits(Math.abs(wBal).toLocaleString())}</span></div>`; 
-        } 
-    });
+    const wNames = ['اول', 'دوم', 'سوم', 'چهارم', 'پنجم'];
+    weeks.forEach((wBal, i) => { if (wBal !== 0) { const wSign = wBal < 0 ? '-' : '+'; const wColor = wBal < 0 ? '#d32f2f' : '#388e3c'; wContainer.innerHTML += `<div class="wk-row"><span>هفته ${wNames[i]}</span><span style="color:${wColor}; direction:ltr;">${wSign} ${toPersianDigits(Math.abs(wBal).toLocaleString())}</span></div>`; } });
     if (wContainer.innerHTML === '') wContainer.innerHTML = '<div style="text-align:center;font-size:10px;color:#999">گردشی ثبت نشده</div>';
-
     document.getElementById('btnViewMonthList').onclick = () => window.location.href = `check-list.html?year=${year}&month=${month}`;
     document.getElementById('monthDetailsModal').style.display = 'flex';
 }
@@ -326,6 +312,8 @@ function closeFilterModal(){document.getElementById('filterModal').style.display
 function applyAdvancedFilter(){ 
     const min=document.getElementById('filterMinAmount').value.replace(/,/g,''); 
     const max=document.getElementById('filterMaxAmount').value.replace(/,/g,''); 
+    
+    // 1. ذخیره در آبجکت وضعیت
     filterState.minAmount=min?parseInt(toEnglishDigits(min)):null; 
     filterState.maxAmount=max?parseInt(toEnglishDigits(max)):null; 
     filterState.startDueDate=document.getElementById('filterStartDueDate').value; 
@@ -334,17 +322,23 @@ function applyAdvancedFilter(){
     filterState.endIssueDate=document.getElementById('filterEndIssueDate').value; 
     filterState.payTo=document.getElementById('filterPayTo').value;
     filterState.bank=document.getElementById('filterBankValue').value;
-    filterState.type=[]; if(document.getElementById('chkPay').checked)filterState.type.push('pay'); if(document.getElementById('chkRec').checked)filterState.type.push('receive');
-    filterState.status=[]; document.querySelectorAll('.status-filter-check:checked').forEach(c=>filterState.status.push(c.value));
+
+    filterState.type=[]; 
+    if(document.getElementById('chkPay').checked) filterState.type.push('pay'); 
+    if(document.getElementById('chkRec').checked) filterState.type.push('receive');
+
+    filterState.status=[]; 
+    document.querySelectorAll('.status-filter-check:checked').forEach(c=>filterState.status.push(c.value));
     
-    closeFilterModal(); // بستن پاپ آپ
-    renderCheckList(); // اعمال فیلتر
+    // 2. بستن مودال و رندر مجدد
+    closeFilterModal(); 
+    renderCheckList(); 
 }
 
 // تابع جدید لغو فیلتر (اضافه شد)
 function resetAdvancedFilter() {
     filterState = { minAmount: null, maxAmount: null, startDueDate: null, endDueDate: null, startIssueDate: null, endIssueDate: null, excludedColors: [], payTo: '', bank: '', type: [], status: [] };
-    // پاکسازی فرم
+    // پاکسازی اینپوت‌ها
     document.getElementById('filterMinAmount').value='';
     document.getElementById('filterMaxAmount').value='';
     document.getElementById('filterStartDueDate').value='';
@@ -354,7 +348,7 @@ function resetAdvancedFilter() {
     document.getElementById('filterPayTo').value='';
     document.getElementById('filterBankValue').value='';
     document.getElementById('filterBankDisplay').value='';
-    // ریست چک باکس
+    // ریست چک‌باکس‌ها
     document.getElementById('chkPay').checked=true;
     document.getElementById('chkRec').checked=true;
     document.querySelectorAll('.status-filter-check').forEach(c=>c.checked=true);
@@ -369,23 +363,26 @@ function toggleFilterColor(c,e){if(filterState.excludedColors.includes(c)){filte
 async function renderCheckList() {
     let l = await fetchChecks();
     const u=new URLSearchParams(window.location.search); const yf=u.get('year'), mf=u.get('month'), tf=u.get('filter');
+    
+    // فیلترهای URL
     if(tf==='pay') l=l.filter(x=>x.type==='pay'); else if(tf==='receive') l=l.filter(x=>x.type==='receive');
     if(yf&&mf) { l=l.filter(x=>{const p=toEnglishDigits(x.date).split('/'); return parseInt(p[0])==yf && parseInt(p[1])==mf;}); document.querySelector('.filter-tabs-container').style.display='none'; document.querySelector('.header-center h1').innerText=`${getMonthName(mf)} ${toPersianDigits(yf)}`; }
-    else if(filterState.status.length>0) l=l.filter(x=>filterState.status.includes(x.status)); 
+    else if (filterState.status.length > 0) l=l.filter(x=>filterState.status.includes(x.status)); 
     else l=l.filter(x=>activeStatusFilters.includes(x.status));
     
+    // فیلترهای پیشرفته
     if(filterState.minAmount) l=l.filter(x=>x.amount>=filterState.minAmount); if(filterState.maxAmount) l=l.filter(x=>x.amount<=filterState.maxAmount);
     if(filterState.startDueDate) l=l.filter(x=>getDateScore(x.date)>=getDateScore(filterState.startDueDate)); if(filterState.endDueDate) l=l.filter(x=>getDateScore(x.date)<=getDateScore(filterState.endDueDate));
     if(filterState.startIssueDate) l=l.filter(x=>getDateScore(x.issueDate)>=getDateScore(filterState.startIssueDate)); if(filterState.endIssueDate) l=l.filter(x=>getDateScore(x.issueDate)<=getDateScore(filterState.endIssueDate));
     if(filterState.payTo) l=l.filter(x=>x.payTo.includes(filterState.payTo));
-    if(filterState.bank) l=l.filter(x=>x.bank===filterState.bank);
-    if(filterState.type.length>0) l=l.filter(x=>filterState.type.includes(x.type));
-    
+    if(filterState.bank) l=l.filter(x=>x.bank === filterState.bank);
+    if(filterState.type.length > 0) l=l.filter(x=>filterState.type.includes(x.type));
     l=l.filter(x=>!filterState.excludedColors.includes(x.colorTag||'none'));
     
     const con=document.getElementById('checkListContainer'); con.innerHTML='';
     document.getElementById('totalCountHeader').innerText=`${toPersianDigits(l.length)} فقره`;
     if(l.length===0){con.innerHTML='<div style="text-align:center;padding-top:60px;color:#ccc">موردی نیست</div>'; return;}
+    
     l.sort((a,b)=>getDateScore(a.date)-getDateScore(b.date));
     const g={}; l.forEach(x=>{const k=toEnglishDigits(x.date).split('/').slice(0,2).join('-'); if(!g[k])g[k]=[]; g[k].push(x);});
     let keys=Object.keys(g).sort((a,b)=>parseInt(a.replace('-',''))-parseInt(b.replace('-','')));
@@ -414,7 +411,12 @@ function setupAddCheckPage() {
     if(p.get('id')){
         editingCheckId=p.get('id'); document.getElementById('pageTitle').innerText="ویرایش چک"; document.getElementById('deleteCheckBtn').style.display='flex'; loadCheckDataForEdit(editingCheckId);
     } else {
-        const d=document.getElementById('inputStatusDisplay'); d.value='در انتظار'; d.style.color='#ffa000'; d.style.fontWeight='bold'; document.getElementById('inputStatusValue').value='pending';
+        const statusDisp = document.getElementById('inputStatusDisplay');
+        statusDisp.value='در انتظار';
+        statusDisp.style.color='#ffa000'; // Default Orange
+        statusDisp.style.fontWeight='bold';
+        document.getElementById('inputStatusValue').value='pending';
+        
         if(document.getElementById('inputIssueDate')) document.getElementById('inputIssueDate').value=toPersianDigits(`${ty}/${tm<10?'0'+tm:tm}/${td<10?'0'+td:td}`); selectedColor='none';
         if(p.get('mode')==='scan'){
             const s=JSON.parse(localStorage.getItem('scannedCheckData')||'{}'); if(s.sayad)document.getElementById('sayadNum').value=toPersianDigits(s.sayad); if(s.date)document.getElementById('inputDate').value=toPersianDigits(s.date); if(s.amount)document.getElementById('inputAmount').value=toPersianDigits(parseInt(s.amount).toLocaleString()); if(s.image){frontImageBase64=s.image; updateImageBox('areaFront',s.image);} localStorage.removeItem('scannedCheckData'); document.getElementById('pageTitle').innerText="چک اسکن شده";
@@ -485,10 +487,11 @@ async function shareCurrentImage() { const b=currentUploadType==='front'?frontIm
 
 // --- Cloud & Scan ---
 async function handleSmartScan(inp) { const f=inp.files[0]; if(!f)return; showLoading("آنالیز..."); const r=new FileReader(); r.onload=async(e)=>{const i=new Image(); i.src=e.target.result; i.onload=async()=>{const c=document.createElement('canvas'); const s=1000/i.width; c.width=1000; c.height=i.height*s; c.getContext('2d').drawImage(i,0,0,c.width,c.height); try{const rs=await fetch(GOOGLE_SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'scan_check_ocr',image:c.toDataURL('image/jpeg',0.6)})}); const j=await rs.json(); if(j.result==='success'){localStorage.setItem('scannedCheckData',JSON.stringify({sayad:j.data.sayad,date:j.data.date,amount:j.data.amount,image:e.target.result})); window.location.href='add-check.html?mode=scan';}else throw new Error(j.error);}catch(er){alert(er.message);}finally{hideLoading(); inp.value='';}}}; r.readAsDataURL(f); }
+async function backupToGoogle() { exportToExcel(); alert('فایل اکسل دانلود شد. لطفا در گوگل درایو آپلود کنید.'); }
+async function restoreFromGoogle() { alert('سیستم آنلاین است. نیازی به بازیابی نیست.'); }
 
 // --- Report ---
-async function setupReportPage() { 
-    let l=await fetchChecks(); const p=l.filter(x=>x.status==='pending'); let s=0; p.forEach(x=>{if(x.type==='pay')s-=parseInt(x.amount);else s+=parseInt(x.amount);}); const c=s<0?'#f44336':s>0?'#4caf50':'#333'; document.getElementById('reportTotalSum').innerHTML=`<span style="color:${c}">${s<0?'-':s>0?'+':''} ${toPersianDigits(Math.abs(s).toLocaleString())}</span> ریال`; 
+async function setupReportPage() { let l=await fetchChecks(); const p=l.filter(x=>x.status==='pending'); let s=0; p.forEach(x=>{if(x.type==='pay')s-=parseInt(x.amount);else s+=parseInt(x.amount);}); const c=s<0?'#f44336':s>0?'#4caf50':'#333'; document.getElementById('reportTotalSum').innerHTML=`<span style="color:${c}">${s<0?'-':s>0?'+':''} ${toPersianDigits(Math.abs(s).toLocaleString())}</span> ریال`; 
     const g={}; p.forEach(x=>{const k=toEnglishDigits(x.date).slice(0,7).replace('/','-'); if(!g[k])g[k]=[]; g[k].push(x);}); const ks=Object.keys(g).sort((a,b)=>parseInt(a.replace('-',''))-parseInt(b.replace('-',''))); const sc=document.getElementById('reportScrollContainer'); sc.innerHTML=''; if(ks.length===0){sc.innerHTML='<div style="text-align:center;width:100%">موردی نیست</div>';return;} 
     ks.forEach(k=>{
         const [y,m]=k.split('-'); const gp=g[k]; let ms=0,mx=0,mn=Infinity; 
