@@ -115,7 +115,7 @@ async function fetchChecks() {
         .from('checks')
         .select('*')
         .order('id', { ascending: false }) 
-        .range(0, 9999); 
+        .range(0, 99999); 
 
     if (error) { console.error(error); return []; }
     return data;
