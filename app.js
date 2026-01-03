@@ -252,11 +252,14 @@ async function exportToExcel() {
 // ============================================
 // نسخه نهایی وارد کردن اکسل (با رنگ و وضعیت)
 // ============================================
+// ============================================
+// نسخه نهایی و تضمینی وارد کردن اکسل (با رفع مشکل فونت و فاصله)
+// ============================================
 async function processExcelFile(inp) { 
     const file = inp.files[0];
     if (!file) return;
 
-    showLoading("در حال پردازش هوشمند...");
+    showLoading("در حال آنالیز دقیق فایل...");
     
     const reader = new FileReader();
     reader.onload = async function(e) {
@@ -270,99 +273,90 @@ async function processExcelFile(inp) {
 
             let checksToAdd = [];
             let newCounterparties = new Set();
+            
+            // دریافت لیست فعلی برای جلوگیری از تکرار طرف حساب
             const existingCPs = await fetchCounterparties();
             const existingNames = existingCPs.map(cp => cp.name.trim());
 
-            // 1. دیکشنری رنگ‌ها (نام فارسی در اکسل -> کد رنگ)
-            const colorMap = {
-                'قرمز': '#ff8a80', 'red': '#ff8a80',
-                'نارنجی': '#ffcc80', 'orange': '#ffcc80',
-                'زرد': '#ffff8d', 'yellow': '#ffff8d',
-                'سبز': '#ccff90', 'green': '#ccff90', 'lime': '#ccff90',
-                'آبی': '#80d8ff', 'blue': '#80d8ff',
-                'بنفش': '#ea80fc', 'purple': '#ea80fc',
-                'صورتی': '#ea80fc'
-            };
-
-            // 2. دیکشنری وضعیت‌ها (نام فارسی در اکسل -> کد وضعیت)
-            const statusMap = {
-                'پاس': 'passed', 'پاس شده': 'passed', 'وصول': 'passed', 'تایید': 'passed',
-                'برگشت': 'bounced', 'برگشتی': 'bounced', 'عدم موجودی': 'bounced',
-                'خرج': 'spent', 'خرج شده': 'spent', 'واگذار': 'spent',
-                'باطل': 'canceled', 'ابطال': 'canceled', 'لغو': 'canceled',
-                'انتظار': 'pending', 'در انتظار': 'pending'
+            // تابع استانداردسازی متن فارسی (حذف ی و ک عربی و فاصله‌ها)
+            const cleanStr = (str) => {
+                if (!str) return "";
+                return str.toString().trim()
+                    .replace(/ي/g, "ی").replace(/ك/g, "ک") // تبدیل عربی به فارسی
+                    .replace(/\s+/g, ' '); // حذف فاصله‌های تکراری
             };
 
             for (let row of jsonData) {
+                // پیدا کردن نام ستون‌ها در این ردیف
                 const keys = Object.keys(row);
                 
-                // تشخیص ستون‌ها
-                const keyAmount = keys.find(k => k.includes('مبلغ') || k.includes('قیمت') || k.toLowerCase().includes('amount') || k.includes('ریال'));
-                const keyDate = keys.find(k => k.includes('تاریخ') || k.toLowerCase().includes('date') || k.includes('سررسید'));
-                const keyName = keys.find(k => k.includes('وجه') || k.includes('نام') || k.includes('گیرنده'));
-                const keyType = keys.find(k => k.includes('نوع') || k.toLowerCase().includes('type'));
-                const keyNum = keys.find(k => k.includes('شماره') || k.toLowerCase().includes('no'));
-                const keySayad = keys.find(k => k.includes('صیاد') || k.toLowerCase().includes('sayad'));
-                const keyDesc = keys.find(k => k.includes('توضیح') || k.includes('بابت'));
-                
-                // ستون‌های جدید
-                const keyColor = keys.find(k => k.includes('رنگ') || k.includes('تگ') || k.toLowerCase().includes('color'));
-                const keyStatus = keys.find(k => k.includes('وضعیت') || k.includes('حالت') || k.toLowerCase().includes('status'));
+                // یافتن کلیدها با تطبیق نرم
+                const findKey = (keywords) => keys.find(k => keywords.some(w => cleanStr(k).includes(w)));
 
-                // استخراج مبلغ
-                let rawAmount = keyAmount ? row[keyAmount] : 0;
+                const keyAmount = findKey(['مبلغ', 'قیمت', 'amount', 'ریال', 'تومان']);
+                const keyDate = findKey(['تاریخ', 'date', 'سررسید', 'زمان']);
+                const keyName = findKey(['وجه', 'نام', 'name', 'گیرنده', 'طرف']);
+                const keyType = findKey(['نوع', 'type']);
+                const keyNum = findKey(['شماره', 'no', 'num']);
+                const keySayad = findKey(['صیاد', 'sayad']);
+                const keyDesc = findKey(['توضیح', 'desc', 'بابت']);
+                const keyColor = findKey(['رنگ', 'تگ', 'color']);
+                const keyStatus = findKey(['وضعیت', 'حالت', 'status']);
+
+                // --- استخراج مبلغ ---
                 let amount = 0;
-                if(rawAmount) {
-                    let s = rawAmount.toString().replace(/,/g, '').trim();
+                if(keyAmount && row[keyAmount]) {
+                    let s = row[keyAmount].toString().replace(/,/g, '').trim();
                     s = toEnglishDigits(s);
                     amount = parseInt(s);
                 }
 
-                // استخراج تاریخ
-                let rawDate = keyDate ? row[keyDate] : '';
+                // --- استخراج تاریخ ---
                 let dateStr = '';
-                if(rawDate) {
-                    dateStr = toEnglishDigits(rawDate.toString().trim());
+                if(keyDate && row[keyDate]) {
+                    dateStr = toEnglishDigits(row[keyDate].toString().trim());
                     if(dateStr.includes('-')) dateStr = dateStr.replace(/-/g, '/');
                 }
 
+                // اگر مبلغ و تاریخ معتبر بود، ادامه بده
                 if (amount > 0 && dateStr.length >= 6) {
-                    // نوع
-                    let type = 'pay';
-                    if (keyType) {
-                        let tVal = row[keyType].toString();
-                        if(tVal.includes('دریافت') || tVal.toLowerCase().includes('rec')) type = 'receive';
+                    
+                    // --- پردازش رنگ (دقیق) ---
+                    let colorTag = 'none';
+                    if (keyColor && row[keyColor]) {
+                        let cText = cleanStr(row[keyColor]); // متن تمیز شده سلول
+                        
+                        if (cText.includes('قرمز') || cText.includes('red')) colorTag = '#ff8a80';
+                        else if (cText.includes('نارنجی') || cText.includes('orange')) colorTag = '#ffcc80';
+                        else if (cText.includes('زرد') || cText.includes('yellow')) colorTag = '#ffff8d';
+                        else if (cText.includes('سبز') || cText.includes('green')) colorTag = '#ccff90';
+                        else if (cText.includes('آبی') || cText.includes('blue')) colorTag = '#80d8ff';
+                        else if (cText.includes('بنفش') || cText.includes('صورتی') || cText.includes('purple')) colorTag = '#ea80fc';
                     }
 
-                    // طرف حساب
-                    const payToName = keyName ? row[keyName].toString().trim() : '';
+                    // --- پردازش وضعیت (دقیق) ---
+                    let status = 'pending'; // پیش‌فرض: در انتظار
+                    if (keyStatus && row[keyStatus]) {
+                        let sText = cleanStr(row[keyStatus]); // متن تمیز شده سلول
+                        
+                        if (sText.includes('پاس') || sText.includes('وصول') || sText.includes('تایید')) status = 'passed';
+                        else if (sText.includes('برگشت') || sText.includes('عدم')) status = 'bounced';
+                        else if (sText.includes('خرج') || sText.includes('واگذار')) status = 'spent';
+                        else if (sText.includes('باطل') || sText.includes('لغو')) status = 'canceled';
+                        // اگر چیزی پیدا نشد یا نوشت "انتظار"، همان pending می‌ماند
+                    }
+
+                    // --- نوع چک ---
+                    let type = 'pay';
+                    if (keyType && row[keyType]) {
+                        let tVal = cleanStr(row[keyType]);
+                        if(tVal.includes('دریافت') || tVal.includes('rec')) type = 'receive';
+                    }
+
+                    // --- طرف حساب ---
+                    const payToName = (keyName && row[keyName]) ? cleanStr(row[keyName]) : '';
                     if (payToName && !existingNames.includes(payToName)) {
                         newCounterparties.add(payToName);
-                    }
-
-                    // --- پردازش رنگ ---
-                    let finalColor = 'none';
-                    if (keyColor) {
-                        let cVal = row[keyColor].toString().trim().toLowerCase(); // مثلا "قرمز"
-                        // چک میکنیم ایا در لیست ما هست؟
-                        for (const [key, value] of Object.entries(colorMap)) {
-                            if (cVal.includes(key)) {
-                                finalColor = value;
-                                break;
-                            }
-                        }
-                    }
-
-                    // --- پردازش وضعیت ---
-                    let finalStatus = 'pending'; // پیش‌فرض
-                    if (keyStatus) {
-                        let sVal = row[keyStatus].toString().trim().toLowerCase(); // مثلا "پاس شده"
-                        for (const [key, value] of Object.entries(statusMap)) {
-                            if (sVal.includes(key)) {
-                                finalStatus = value;
-                                break;
-                            }
-                        }
                     }
 
                     checksToAdd.push({
@@ -370,12 +364,12 @@ async function processExcelFile(inp) {
                         date: dateStr,
                         type: type,
                         payTo: payToName,
-                        desc: keyDesc ? row[keyDesc].toString().trim() : '',
-                        checkNum: keyNum ? toEnglishDigits(row[keyNum].toString().trim()) : '',
-                        sayadNum: keySayad ? toEnglishDigits(row[keySayad].toString().trim()) : '',
-                        status: finalStatus,    // وضعیت اعمال شد
-                        colorTag: finalColor,   // رنگ اعمال شد
-                        bank: 'meli',
+                        desc: (keyDesc && row[keyDesc]) ? cleanStr(row[keyDesc]) : '',
+                        checkNum: (keyNum && row[keyNum]) ? toEnglishDigits(row[keyNum].toString()) : '',
+                        sayadNum: (keySayad && row[keySayad]) ? toEnglishDigits(row[keySayad].toString()) : '',
+                        status: status,      // <--- وضعیت اعمال شده
+                        colorTag: colorTag,  // <--- رنگ اعمال شده
+                        bank: 'meli',        // پیش‌فرض
                         frontImage: null,
                         backImage: null
                     });
@@ -392,10 +386,10 @@ async function processExcelFile(inp) {
             if (checksToAdd.length > 0) {
                 const { error } = await sb.from('checks').insert(checksToAdd);
                 if (error) throw error;
-                alert(`${checksToAdd.length} فقره چک با موفقیت وارد شد.`);
+                alert(`${checksToAdd.length} فقره چک با موفقیت (همراه با رنگ و وضعیت) وارد شد.`);
                 location.reload();
             } else {
-                alert("هیچ چک معتبری یافت نشد. (مبلغ و تاریخ الزامی است)");
+                alert("هیچ چک معتبری یافت نشد. ستون‌های مبلغ و تاریخ را بررسی کنید.");
             }
 
         } catch (err) {
